@@ -537,15 +537,19 @@ class QuantumJumper {
         this.platforms.push({ x: 0, y: 550, width: 200, height: 50, dimension: 0 });
         
         const numCollectibles = 3 + Math.floor(level / 2);
+        console.log(`Generating level ${level}: target collectibles = ${numCollectibles}`);
+        
         const platforms = [];
         const collectibles = [];
         const hazards = [];
         
         // 根据关卡难度调整参数
         const basePathStages = 4 + Math.floor(level / 2); // 4-10关：5-9个阶段
-        const pathStages = basePathStages;
+        const pathStages = Math.max(basePathStages, numCollectibles + 1); // 确保阶段数至少比收集品数多1
         const hazardDensity = Math.min(0.7, 0.3 + (level - 4) * 0.1); // 4关30%，10关70%
         const requireDimensionSwitch = level >= 6; // 6关以上要求必须切换维度
+        
+        console.log(`Level ${level}: pathStages=${pathStages}, numCollectibles=${numCollectibles}`);
         
         // 生成主要路径平台（确保可达性）
         let lastX = 200;
@@ -595,8 +599,8 @@ class QuantumJumper {
             });
             
             // 收集品放在平台上（确保每个收集品都有明确的路径）
-            // 确保在前几个阶段放置主要收集品
-            if (i < numCollectibles) {
+            // 确保在前numCollectibles个阶段都放置收集品
+            if (collectibles.length < numCollectibles) {
                 collectibles.push({
                     x: x + width / 2 - 7,
                     y: y - 25,
@@ -675,7 +679,11 @@ class QuantumJumper {
         }
         
         // 确保收集品数量足够 - 优先从主要路径平台添加
-        while (collectibles.length < numCollectibles && platforms.length > 0) {
+        let attempts = 0;
+        const maxAttempts = platforms.length * 2; // 限制尝试次数，避免无限循环
+        
+        while (collectibles.length < numCollectibles && platforms.length > 0 && attempts < maxAttempts) {
+            attempts++;
             const plat = platforms[Math.floor(rng() * platforms.length)];
             // 检查是否已经有收集品在这个平台附近
             const hasNearbyCollectible = collectibles.some(c => 
@@ -693,7 +701,7 @@ class QuantumJumper {
                 });
             } else {
                 // 如果附近已有收集品，尝试其他平台
-                const availablePlats = platforms.filter((p, idx) => {
+                const availablePlats = platforms.filter((p) => {
                     const checkX = p.x + p.width / 2;
                     const checkY = p.y - 25;
                     return !collectibles.some(c => 
@@ -722,16 +730,37 @@ class QuantumJumper {
             }
         }
         
-        // 调试信息：确保收集品数量正确
-        if (collectibles.length !== numCollectibles) {
-            console.warn(`Level ${level}: Expected ${numCollectibles} collectibles, got ${collectibles.length}. Adding more...`);
-            // 如果还是不够，强制添加到最后几个平台
+        // 强制确保收集品数量正确 - 这是最后保障
+        if (collectibles.length < numCollectibles) {
+            console.warn(`Level ${level}: Expected ${numCollectibles} collectibles, got ${collectibles.length}. Force adding remaining...`);
             const remaining = numCollectibles - collectibles.length;
-            for (let i = 0; i < remaining && i < platforms.length; i++) {
-                const plat = platforms[platforms.length - 1 - i];
+            
+            // 从所有平台中选择，优先选择还没有收集品的平台
+            const platformsWithoutCollectibles = platforms.filter(p => {
+                const checkX = p.x + p.width / 2;
+                const checkY = p.y - 25;
+                return !collectibles.some(c => 
+                    Math.abs(c.x - checkX) < 30 && Math.abs(c.y - checkY) < 30
+                );
+            });
+            
+            // 添加剩余的收集品
+            for (let i = 0; i < remaining; i++) {
+                let targetPlatform;
+                if (platformsWithoutCollectibles.length > 0) {
+                    // 优先选择没有收集品的平台
+                    targetPlatform = platformsWithoutCollectibles[i % platformsWithoutCollectibles.length];
+                } else if (platforms.length > 0) {
+                    // 如果没有可用平台，强制添加到已有平台（可能重叠）
+                    targetPlatform = platforms[i % platforms.length];
+                } else {
+                    // 如果连平台都没有，添加到基础平台
+                    break;
+                }
+                
                 collectibles.push({
-                    x: plat.x + plat.width / 2 - 7,
-                    y: plat.y - 25,
+                    x: targetPlatform.x + targetPlatform.width / 2 - 7,
+                    y: targetPlatform.y - 25,
                     width: 15,
                     height: 15,
                     collected: false
@@ -763,14 +792,33 @@ class QuantumJumper {
             });
         }
         
+        // 最终强制检查：如果还是不够，强制添加到基础平台
+        if (this.collectibles.length < numCollectibles) {
+            console.error(`Level ${level}: CRITICAL ERROR! Collectibles count mismatch! Expected ${numCollectibles}, got ${this.collectibles.length}. Adding to base platform.`);
+            const remaining = numCollectibles - this.collectibles.length;
+            for (let i = 0; i < remaining; i++) {
+                this.collectibles.push({
+                    x: 100 + i * 50,
+                    y: 500,
+                    width: 15,
+                    height: 15,
+                    collected: false
+                });
+            }
+            console.log(`- Fixed: Now have ${this.collectibles.length} collectibles`);
+        }
+        
         // 最终验证：确保收集品数量正确
         console.log(`Level ${level} generation complete:`);
         console.log(`- Expected collectibles: ${numCollectibles}`);
         console.log(`- Actual collectibles: ${this.collectibles.length}`);
         console.log(`- All collected = false: ${this.collectibles.every(c => c.collected === false)}`);
         
-        if (this.collectibles.length < numCollectibles) {
-            console.error(`Level ${level}: Collectibles count mismatch! Expected ${numCollectibles}, got ${this.collectibles.length}`);
+        // 验证最终数量
+        if (this.collectibles.length !== numCollectibles) {
+            console.error(`Level ${level}: STILL MISMATCH! Expected ${numCollectibles}, got ${this.collectibles.length}`);
+        } else {
+            console.log(`✓ Level ${level}: Collectibles count verified: ${this.collectibles.length}`);
         }
     }
     
