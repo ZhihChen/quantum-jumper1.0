@@ -10,6 +10,8 @@ class QuantumJumper {
         this.maxEnergy = 100;
         this.levelCompleteTriggered = false; // 防止重复触发关卡完成
         this.lastDimensionSwitchTime = 0; // 记录最后一次维度切换时间，用于掉落保护
+        this.upperBoundWarningTime = 0; // 记录超出上界的时间，0表示未超出
+        this.upperBoundGracePeriod = 5000; // 上界宽限期：5秒
         
         // 维度系统
         this.currentDimension = 0;
@@ -187,6 +189,7 @@ class QuantumJumper {
         this.gameState = 'playing';
         document.getElementById('gameOverlay').classList.add('hidden');
         this.levelCompleteTriggered = false; // 重置关卡完成标志
+        this.upperBoundWarningTime = 0; // 重置上界警告时间
         // 如果能量耗尽，恢复能量；否则保持当前能量
         if (this.energy <= 0) {
             this.energy = this.maxEnergy;
@@ -235,8 +238,17 @@ class QuantumJumper {
     
     switchDimension(dimension) {
         if (dimension >= 0 && dimension < this.dimensions.length && this.gameState === 'playing') {
+            const previousDimension = this.dimensions[this.currentDimension];
+            const newDimension = this.dimensions[dimension];
             this.currentDimension = dimension;
             this.lastDimensionSwitchTime = Date.now(); // 记录切换时间，用于掉落保护
+            
+            // 如果从反重力模式切换到其他模式，且玩家还在上界外，给机会恢复
+            if (previousDimension.gravity < 0 && newDimension.gravity >= 0 && this.upperBoundWarningTime > 0) {
+                // 切换到正常维度，宽限期继续，但如果玩家回到屏幕内则清除警告
+                // 这个检查会在checkCollisions中处理
+            }
+            
             this.updateDimensionButtons();
             this.createDimensionSwitchEffect();
             this.playSound('dimensionSwitch');
@@ -245,8 +257,16 @@ class QuantumJumper {
     }
     
     cycleDimension(direction) {
+        const previousDimension = this.dimensions[this.currentDimension];
         this.currentDimension = (this.currentDimension + direction + this.dimensions.length) % this.dimensions.length;
+        const newDimension = this.dimensions[this.currentDimension];
         this.lastDimensionSwitchTime = Date.now(); // 记录切换时间，用于掉落保护
+        
+        // 如果从反重力模式切换到其他模式，处理宽限期逻辑
+        if (previousDimension.gravity < 0 && newDimension.gravity >= 0 && this.upperBoundWarningTime > 0) {
+            // 切换到正常维度，宽限期继续
+        }
+        
         this.updateDimensionButtons();
         this.createDimensionSwitchEffect();
         this.playSound('dimensionSwitch');
@@ -256,8 +276,16 @@ class QuantumJumper {
     quickSwitch() {
         // 在当前维度和前一个维度间切换
         const prevDimension = this.currentDimension;
+        const previousDimension = this.dimensions[this.currentDimension];
         this.currentDimension = (this.currentDimension + 1) % this.dimensions.length;
+        const newDimension = this.dimensions[this.currentDimension];
         this.lastDimensionSwitchTime = Date.now(); // 记录切换时间，用于掉落保护
+        
+        // 如果从反重力模式切换到其他模式，处理宽限期逻辑
+        if (previousDimension.gravity < 0 && newDimension.gravity >= 0 && this.upperBoundWarningTime > 0) {
+            // 切换到正常维度，宽限期继续
+        }
+        
         this.updateDimensionButtons();
         this.createDimensionSwitchEffect();
         this.updateUI();
@@ -295,6 +323,7 @@ class QuantumJumper {
         this.player.vx = 0;
         this.player.vy = 0;
         this.player.trail = [];
+        this.upperBoundWarningTime = 0; // 重置上界警告时间
     }
     
     loadLevel(level) {
@@ -303,6 +332,7 @@ class QuantumJumper {
         this.hazards = [];
         this.portals = [];
         this.levelCompleteTriggered = false; // 重置关卡完成标志
+        this.upperBoundWarningTime = 0; // 重置上界警告时间
         
         // 根据关卡生成不同的布局
         switch (level) {
@@ -565,15 +595,49 @@ class QuantumJumper {
         // 添加维度切换后的短暂保护期（500ms），避免切换瞬间掉落扣能量
         const timeSinceDimensionSwitch = Date.now() - this.lastDimensionSwitchTime;
         const dimensionSwitchProtection = timeSinceDimensionSwitch < 500;
+        const currentTime = Date.now();
         
         if (isReverseGravity) {
             // 反重力模式：从上方掉落
             if (this.player.y < -50 && !dimensionSwitchProtection) {
-                this.takeDamage(50);
-                this.resetPlayer();
+                // 首次超出上界，记录时间
+                if (this.upperBoundWarningTime === 0) {
+                    this.upperBoundWarningTime = currentTime;
+                }
+                
+                // 检查是否超过宽限期
+                const timeSinceWarning = currentTime - this.upperBoundWarningTime;
+                if (timeSinceWarning >= this.upperBoundGracePeriod) {
+                    // 宽限期已过，gameover
+                    this.takeDamage(50);
+                    this.resetPlayer();
+                    this.upperBoundWarningTime = 0; // 重置警告时间
+                }
+                // 否则在宽限期内，允许玩家切换维度来恢复
+            } else if (this.player.y >= -50) {
+                // 玩家回到屏幕内，清除警告
+                this.upperBoundWarningTime = 0;
             }
         } else {
             // 正常重力模式：从下方掉落
+            // 如果之前在反重力模式下超出上界，现在切换回正常维度，检查是否恢复
+            if (this.upperBoundWarningTime > 0) {
+                // 如果玩家回到屏幕内（y >= 0），清除警告
+                if (this.player.y >= 0 && this.player.y <= this.canvas.height) {
+                    this.upperBoundWarningTime = 0; // 成功恢复，清除警告
+                } else {
+                    // 还在屏幕外，继续计时
+                    const timeSinceWarning = currentTime - this.upperBoundWarningTime;
+                    if (timeSinceWarning >= this.upperBoundGracePeriod) {
+                        // 宽限期已过，gameover
+                        this.takeDamage(50);
+                        this.resetPlayer();
+                        this.upperBoundWarningTime = 0; // 重置警告时间
+                    }
+                }
+            }
+            
+            // 正常重力的掉落检测（独立于反重力警告）
             if (this.player.y > this.canvas.height + 50 && !dimensionSwitchProtection) {
                 this.takeDamage(50);
                 this.resetPlayer();
@@ -684,6 +748,9 @@ class QuantumJumper {
         
         // 绘制维度指示器
         this.renderDimensionIndicator();
+        
+        // 绘制宽限期警告
+        this.renderUpperBoundWarning();
     }
     
     renderDimensionBackground() {
@@ -889,6 +956,44 @@ class QuantumJumper {
         this.ctx.fillRect(0, this.canvas.height - 4, this.canvas.width, 4);
         this.ctx.fillRect(0, 0, 4, this.canvas.height);
         this.ctx.fillRect(this.canvas.width - 4, 0, 4, this.canvas.height);
+    }
+    
+    renderUpperBoundWarning() {
+        // 如果在上界宽限期内，显示警告
+        if (this.upperBoundWarningTime > 0 && this.gameState === 'playing') {
+            const currentTime = Date.now();
+            const timeSinceWarning = currentTime - this.upperBoundWarningTime;
+            const remainingTime = this.upperBoundGracePeriod - timeSinceWarning;
+            
+            if (remainingTime > 0) {
+                // 计算警告强度（越接近0越紧急）
+                const warningIntensity = Math.min(1, remainingTime / 1000); // 最后1秒最紧急
+                const alpha = 0.5 + (1 - warningIntensity) * 0.5; // 透明度随剩余时间变化
+                const pulse = Math.sin(Date.now() * 0.01) * 0.2 + 0.8; // 脉冲效果
+                
+                // 绘制红色警告背景闪烁效果
+                this.ctx.fillStyle = `rgba(255, 0, 0, ${alpha * 0.2 * pulse})`;
+                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+                
+                // 绘制警告文字（带阴影效果）
+                const remainingSeconds = (remainingTime / 1000).toFixed(1);
+                this.ctx.font = 'bold 36px Orbitron, sans-serif';
+                this.ctx.textAlign = 'center';
+                this.ctx.textBaseline = 'middle';
+                
+                // 文字阴影
+                this.ctx.fillStyle = `rgba(0, 0, 0, ${alpha * 0.8})`;
+                this.ctx.fillText('警告：超出边界！', this.canvas.width / 2 + 2, this.canvas.height / 2 - 42);
+                this.ctx.fillText(`剩余时间: ${remainingSeconds}秒`, this.canvas.width / 2 + 2, this.canvas.height / 2 - 2);
+                this.ctx.fillText('请切换维度返回！', this.canvas.width / 2 + 2, this.canvas.height / 2 + 38);
+                
+                // 文字主体
+                this.ctx.fillStyle = `rgba(255, 0, 0, ${alpha})`;
+                this.ctx.fillText('警告：超出边界！', this.canvas.width / 2, this.canvas.height / 2 - 40);
+                this.ctx.fillText(`剩余时间: ${remainingSeconds}秒`, this.canvas.width / 2, this.canvas.height / 2);
+                this.ctx.fillText('请切换维度返回！', this.canvas.width / 2, this.canvas.height / 2 + 40);
+            }
+        }
     }
     
     updateUI() {
