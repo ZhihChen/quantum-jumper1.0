@@ -345,6 +345,8 @@ class QuantumJumper {
     }
     
     loadLevel(level) {
+        console.log(`=== loadLevel(${level}) called ===`);
+        
         this.platforms = [];
         this.collectibles = [];
         this.hazards = [];
@@ -400,8 +402,25 @@ class QuantumJumper {
                 if (level > this.maxLevel) {
                     this.showVictory();
                 } else {
+                    console.warn(`Unknown level ${level}, loading level 1 as fallback`);
                     this.loadLevel1(); // 默认加载第一关
                 }
+        }
+        
+        // 验证关卡加载结果
+        console.log(`Level ${level} loaded successfully:`);
+        console.log(`- Platforms: ${this.platforms.length}`);
+        console.log(`- Collectibles: ${this.collectibles.length}`);
+        if (this.collectibles.length > 0) {
+            const allUncollected = this.collectibles.every(c => c.collected === false);
+            console.log(`- All collectibles initialized with collected=false: ${allUncollected}`);
+            if (!allUncollected) {
+                // 强制重置所有收集品状态
+                this.collectibles.forEach(c => c.collected = false);
+                console.warn(`- Fixed: Reset all collectibles to collected=false`);
+            }
+        } else {
+            console.error(`- ERROR: No collectibles in level ${level}!`);
         }
     }
     
@@ -724,6 +743,14 @@ class QuantumJumper {
         this.collectibles.push(...collectibles);
         this.hazards.push(...hazards);
         
+        // 确保所有收集品的collected状态为false
+        this.collectibles.forEach((c, idx) => {
+            if (c.collected !== false) {
+                console.warn(`Level ${level} collectible ${idx}: collected was ${c.collected}, resetting to false`);
+                c.collected = false;
+            }
+        });
+        
         // 最终验证：确保至少有一个收集品
         if (this.collectibles.length === 0) {
             console.error(`Level ${level}: No collectibles generated! Adding one to base platform.`);
@@ -734,6 +761,16 @@ class QuantumJumper {
                 height: 15,
                 collected: false
             });
+        }
+        
+        // 最终验证：确保收集品数量正确
+        console.log(`Level ${level} generation complete:`);
+        console.log(`- Expected collectibles: ${numCollectibles}`);
+        console.log(`- Actual collectibles: ${this.collectibles.length}`);
+        console.log(`- All collected = false: ${this.collectibles.every(c => c.collected === false)}`);
+        
+        if (this.collectibles.length < numCollectibles) {
+            console.error(`Level ${level}: Collectibles count mismatch! Expected ${numCollectibles}, got ${this.collectibles.length}`);
         }
     }
     
@@ -878,6 +915,10 @@ class QuantumJumper {
                 this.quantumShards++;
                 this.energy = Math.min(this.energy + 10, this.maxEnergy);
                 this.createCollectionEffect(collectible);
+                
+                // 调试信息
+                const remaining = this.collectibles.filter(c => !c.collected).length;
+                console.log(`Collected shard! ${remaining} remaining in level ${this.currentLevel}`);
             }
         });
         
@@ -990,25 +1031,37 @@ class QuantumJumper {
     
     checkWinCondition() {
         // 确保有收集品且游戏状态正确
-        if (this.collectibles.length === 0 || this.gameState !== 'playing') {
+        if (this.collectibles.length === 0) {
+            console.warn(`Level ${this.currentLevel}: No collectibles! This should not happen.`);
             return;
         }
         
-        const allCollected = this.collectibles.every(c => c.collected);
-        const uncollectedCount = this.collectibles.filter(c => !c.collected).length;
-        
-        // 调试信息：每帧检查（但只在接近完成时输出）
-        if (uncollectedCount <= 1) {
-            // console.log(`Level ${this.currentLevel}: ${uncollectedCount} collectibles remaining`);
+        if (this.gameState !== 'playing') {
+            return;
         }
         
-        // 检查是否所有收集品都已收集
-        if (allCollected && !this.levelCompleteTriggered) {
-            console.log(`Level ${this.currentLevel} completed! All ${this.collectibles.length} collectibles collected.`);
+        // 检查收集状态
+        const uncollectedCount = this.collectibles.filter(c => !c.collected).length;
+        const collectedCount = this.collectibles.filter(c => c.collected).length;
+        const allCollected = uncollectedCount === 0 && collectedCount > 0;
+        
+        // 详细的调试信息
+        if (uncollectedCount === 0 && collectedCount > 0 && !this.levelCompleteTriggered) {
+            console.log(`=== LEVEL ${this.currentLevel} COMPLETED ===`);
+            console.log(`Total collectibles: ${this.collectibles.length}`);
+            console.log(`Collected: ${collectedCount}`);
+            console.log(`Uncollected: ${uncollectedCount}`);
+            console.log(`All collected: ${allCollected}`);
+            console.log(`Level complete triggered: ${this.levelCompleteTriggered}`);
+            
             this.levelCompleteTriggered = true;
             this.showLevelComplete();
+            
+            // 使用箭头函数确保this绑定正确
+            const self = this;
             setTimeout(() => {
-                this.nextLevel();
+                console.log(`Timeout callback executing for level ${self.currentLevel}`);
+                self.nextLevel();
             }, 2000);
         }
     }
@@ -1050,20 +1103,48 @@ class QuantumJumper {
     }
     
     nextLevel() {
-        console.log(`Moving from level ${this.currentLevel} to next level...`);
+        console.log(`=== nextLevel() called ===`);
+        console.log(`Current level: ${this.currentLevel}`);
+        console.log(`Max level: ${this.maxLevel}`);
+        console.log(`Game state: ${this.gameState}`);
+        
         if (this.currentLevel >= this.maxLevel) {
             // 完成所有关卡，显示胜利
             console.log('All levels completed! Showing victory screen.');
             this.showVictory();
         } else {
+            const previousLevel = this.currentLevel;
             this.currentLevel++;
-            console.log(`Loading level ${this.currentLevel}...`);
+            console.log(`Moving from level ${previousLevel} to level ${this.currentLevel}`);
+            
             this.energy = this.maxEnergy; // 恢复能量
             this.levelCompleteTriggered = false; // 重置关卡完成标志
+            
+            console.log(`Loading level ${this.currentLevel}...`);
             this.loadLevel(this.currentLevel);
+            
+            console.log(`Level ${this.currentLevel} loaded:`);
+            console.log(`- Platforms: ${this.platforms.length}`);
+            console.log(`- Collectibles: ${this.collectibles.length}`);
+            console.log(`- Hazards: ${this.hazards.length}`);
+            
+            // 验证收集品是否正确初始化
+            const uncollected = this.collectibles.filter(c => !c.collected).length;
+            const collected = this.collectibles.filter(c => c.collected).length;
+            console.log(`- Uncollected: ${uncollected}, Collected: ${collected}`);
+            
+            if (this.collectibles.length === 0) {
+                console.error(`ERROR: Level ${this.currentLevel} has no collectibles!`);
+            }
+            
             this.resetPlayer();
             this.updateUI();
-            console.log(`Level ${this.currentLevel} loaded. Collectibles: ${this.collectibles.length}`);
+            
+            // 确保游戏状态为playing
+            if (this.gameState !== 'playing') {
+                console.warn(`Game state was ${this.gameState}, setting to playing`);
+                this.gameState = 'playing';
+            }
         }
     }
     
