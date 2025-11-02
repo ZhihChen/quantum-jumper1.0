@@ -576,6 +576,7 @@ class QuantumJumper {
             });
             
             // 收集品放在平台上（确保每个收集品都有明确的路径）
+            // 确保在前几个阶段放置主要收集品
             if (i < numCollectibles) {
                 collectibles.push({
                     x: x + width / 2 - 7,
@@ -618,20 +619,20 @@ class QuantumJumper {
             lastY = y;
         }
         
-        // 添加最终挑战区域（6关以上）
-        if (level >= 6) {
+        // 添加最终挑战区域（4关以上都有，6关以上更复杂）
+        if (level >= 4) {
             const finalDim = Math.floor(rng() * 4);
-            platforms.push({
+            const finalPlat = {
                 x: Math.min(750, lastX + 50),
                 y: 150 + rng() * 200,
                 width: 80 + rng() * 40,
                 height: 20,
                 dimension: finalDim
-            });
+            };
+            platforms.push(finalPlat);
             
-            // 最后的收集品
+            // 如果收集品还不够，在最终平台添加
             if (collectibles.length < numCollectibles) {
-                const finalPlat = platforms[platforms.length - 1];
                 collectibles.push({
                     x: finalPlat.x + finalPlat.width / 2 - 7,
                     y: finalPlat.y - 25,
@@ -641,12 +642,12 @@ class QuantumJumper {
                 });
             }
             
-            // 最终区域危险
-            if (level >= 8 && rng() > 0.5) {
+            // 最终区域危险（难度递增：6关以上出现）
+            if (level >= 6 && rng() > 0.4) {
                 hazards.push({
                     x: Math.min(700, lastX),
                     y: 300 + rng() * 150,
-                    width: 80 + rng() * 60,
+                    width: 60 + rng() * 60,
                     height: 20,
                     dimension: Math.floor(rng() * 4),
                     type: 'laser'
@@ -654,21 +655,86 @@ class QuantumJumper {
             }
         }
         
-        // 确保收集品数量足够
-        while (collectibles.length < numCollectibles) {
+        // 确保收集品数量足够 - 优先从主要路径平台添加
+        while (collectibles.length < numCollectibles && platforms.length > 0) {
             const plat = platforms[Math.floor(rng() * platforms.length)];
-            collectibles.push({
-                x: plat.x + plat.width / 2 - 7,
-                y: plat.y - 25,
-                width: 15,
-                height: 15,
-                collected: false
-            });
+            // 检查是否已经有收集品在这个平台附近
+            const hasNearbyCollectible = collectibles.some(c => 
+                Math.abs(c.x - (plat.x + plat.width / 2)) < 50 && 
+                Math.abs(c.y - (plat.y - 25)) < 50
+            );
+            
+            if (!hasNearbyCollectible) {
+                collectibles.push({
+                    x: plat.x + plat.width / 2 - 7,
+                    y: plat.y - 25,
+                    width: 15,
+                    height: 15,
+                    collected: false
+                });
+            } else {
+                // 如果附近已有收集品，尝试其他平台
+                const availablePlats = platforms.filter((p, idx) => {
+                    const checkX = p.x + p.width / 2;
+                    const checkY = p.y - 25;
+                    return !collectibles.some(c => 
+                        Math.abs(c.x - checkX) < 50 && Math.abs(c.y - checkY) < 50
+                    );
+                });
+                if (availablePlats.length > 0) {
+                    const plat2 = availablePlats[Math.floor(rng() * availablePlats.length)];
+                    collectibles.push({
+                        x: plat2.x + plat2.width / 2 - 7,
+                        y: plat2.y - 25,
+                        width: 15,
+                        height: 15,
+                        collected: false
+                    });
+                } else {
+                    // 如果所有平台都有收集品了，强制添加（可能重叠，但至少保证数量）
+                    collectibles.push({
+                        x: plat.x + plat.width / 2 - 7,
+                        y: plat.y - 25,
+                        width: 15,
+                        height: 15,
+                        collected: false
+                    });
+                }
+            }
+        }
+        
+        // 调试信息：确保收集品数量正确
+        if (collectibles.length !== numCollectibles) {
+            console.warn(`Level ${level}: Expected ${numCollectibles} collectibles, got ${collectibles.length}. Adding more...`);
+            // 如果还是不够，强制添加到最后几个平台
+            const remaining = numCollectibles - collectibles.length;
+            for (let i = 0; i < remaining && i < platforms.length; i++) {
+                const plat = platforms[platforms.length - 1 - i];
+                collectibles.push({
+                    x: plat.x + plat.width / 2 - 7,
+                    y: plat.y - 25,
+                    width: 15,
+                    height: 15,
+                    collected: false
+                });
+            }
         }
         
         this.platforms.push(...platforms);
         this.collectibles.push(...collectibles);
         this.hazards.push(...hazards);
+        
+        // 最终验证：确保至少有一个收集品
+        if (this.collectibles.length === 0) {
+            console.error(`Level ${level}: No collectibles generated! Adding one to base platform.`);
+            this.collectibles.push({
+                x: 100,
+                y: 500,
+                width: 15,
+                height: 15,
+                collected: false
+            });
+        }
     }
     
     update(deltaTime) {
@@ -923,8 +989,22 @@ class QuantumJumper {
     }
     
     checkWinCondition() {
+        // 确保有收集品且游戏状态正确
+        if (this.collectibles.length === 0 || this.gameState !== 'playing') {
+            return;
+        }
+        
         const allCollected = this.collectibles.every(c => c.collected);
-        if (allCollected && this.collectibles.length > 0 && !this.levelCompleteTriggered) {
+        const uncollectedCount = this.collectibles.filter(c => !c.collected).length;
+        
+        // 调试信息：每帧检查（但只在接近完成时输出）
+        if (uncollectedCount <= 1) {
+            // console.log(`Level ${this.currentLevel}: ${uncollectedCount} collectibles remaining`);
+        }
+        
+        // 检查是否所有收集品都已收集
+        if (allCollected && !this.levelCompleteTriggered) {
+            console.log(`Level ${this.currentLevel} completed! All ${this.collectibles.length} collectibles collected.`);
             this.levelCompleteTriggered = true;
             this.showLevelComplete();
             setTimeout(() => {
@@ -970,16 +1050,20 @@ class QuantumJumper {
     }
     
     nextLevel() {
+        console.log(`Moving from level ${this.currentLevel} to next level...`);
         if (this.currentLevel >= this.maxLevel) {
             // 完成所有关卡，显示胜利
+            console.log('All levels completed! Showing victory screen.');
             this.showVictory();
         } else {
             this.currentLevel++;
+            console.log(`Loading level ${this.currentLevel}...`);
             this.energy = this.maxEnergy; // 恢复能量
             this.levelCompleteTriggered = false; // 重置关卡完成标志
             this.loadLevel(this.currentLevel);
             this.resetPlayer();
             this.updateUI();
+            console.log(`Level ${this.currentLevel} loaded. Collectibles: ${this.collectibles.length}`);
         }
     }
     
