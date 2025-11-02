@@ -388,401 +388,216 @@ class QuantumJumper {
                 break;
                 
             case 5:
-                // 第5关：多维度组合，更窄的平台，更多危险区域
+                // 第5关：反重力探索 - 让玩家充分体验反重力维度的乐趣
                 this.platforms.push(
-                    { x: 0, y: 550, width: 120, height: 50, dimension: 0 },
-                    { x: 250, y: 480, width: 60, height: 20, dimension: 2 }, // 时间扭曲平台
-                    { x: 100, y: 400, width: 50, height: 20, dimension: 1 }, // 反重力平台
-                    { x: 400, y: 350, width: 60, height: 20, dimension: 3 }, // 能量场平台
-                    { x: 300, y: 250, width: 50, height: 20, dimension: 0 },
-                    { x: 550, y: 200, width: 60, height: 20, dimension: 0 }
+                    { x: 0, y: 550, width: 200, height: 50, dimension: 0 }, // 宽敞的起始平台
+                    { x: 400, y: 450, width: 120, height: 20, dimension: 0 },
+                    { x: 200, y: 350, width: 100, height: 20, dimension: 1 }, // 反重力平台 - 主要体验点
+                    { x: 500, y: 250, width: 120, height: 20, dimension: 1 }, // 反重力平台 - 主要体验点
+                    { x: 350, y: 150, width: 100, height: 20, dimension: 0 },
+                    { x: 600, y: 500, width: 150, height: 20, dimension: 0 }
                 );
                 
-                // 更多动态红色方块
+                // 适量的危险区域，增加挑战性但不阻碍探索
                 this.hazards.push(
-                    { x: 150, y: 500, width: 100, height: 20, dimension: 0, type: 'laser' },
-                    { x: 350, y: 450, width: 100, height: 20, dimension: 0, type: 'laser' },
-                    { x: 200, y: 300, width: 150, height: 20, dimension: 0, type: 'laser' },
-                    { x: 450, y: 150, width: 200, height: 20, dimension: 0, type: 'laser' }
+                    { x: 250, y: 500, width: 120, height: 20, dimension: 0, type: 'laser' },
+                    { x: 400, y: 300, width: 100, height: 20, dimension: 0, type: 'laser' },
+                    { x: 200, y: 200, width: 120, height: 20, dimension: 0, type: 'laser' }
                 );
                 
+                // 分布在不同高度的收集品，鼓励使用反重力
                 this.collectibles.push(
-                    { x: 280, y: 430, width: 15, height: 15, collected: false },
-                    { x: 125, y: 350, width: 15, height: 15, collected: false },
-                    { x: 430, y: 300, width: 15, height: 15, collected: false },
-                    { x: 325, y: 200, width: 15, height: 15, collected: false },
-                    { x: 580, y: 150, width: 15, height: 15, collected: false }
+                    { x: 450, y: 400, width: 15, height: 15, collected: false },
+                    { x: 250, y: 300, width: 15, height: 15, collected: false }, // 需要反重力
+                    { x: 550, y: 200, width: 15, height: 15, collected: false }, // 需要反重力
+                    { x: 380, y: 100, width: 15, height: 15, collected: false },
+                    { x: 650, y: 450, width: 15, height: 15, collected: false }
                 );
                 break;
                 
             case 6:
-                // 第6关：需要精确维度切换的平台
+                // 第6关：时间迷宫 - 突出时间扭曲维度的特色
                 this.platforms.push(
-                    { x: 0, y: 550, width: 100, height: 50, dimension: 0 },
-                    { x: 300, y: 500, width: 70, height: 20, dimension: 0 },
-                    { x: 150, y: 420, width: 60, height: 20, dimension: 1 }, // 反重力平台
-                    { x: 450, y: 380, width: 60, height: 20, dimension: 2 }, // 时间扭曲平台
-                    { x: 250, y: 300, width: 50, height: 20, dimension: 3 }, // 能量场平台
-                    { x: 550, y: 300, width: 50, height: 20, dimension: 0 },
-                    { x: 400, y: 200, width: 60, height: 20, dimension: 1 }, // 反重力平台
-                    { x: 650, y: 150, width: 70, height: 20, dimension: 0 }
+                    { x: 0, y: 550, width: 180, height: 50, dimension: 0 },
+                    { x: 300, y: 480, width: 100, height: 20, dimension: 0 },
+                    { x: 500, y: 400, width: 100, height: 20, dimension: 2 }, // 时间扭曲平台 - 重点体验
+                    { x: 200, y: 350, width: 100, height: 20, dimension: 0 },
+                    { x: 400, y: 280, width: 100, height: 20, dimension: 2 }, // 时间扭曲平台 - 重点体验
+                    { x: 600, y: 220, width: 100, height: 20, dimension: 0 },
+                    { x: 300, y: 150, width: 100, height: 20, dimension: 2 }  // 时间扭曲平台 - 终点前
                 );
                 
-                // 交错的危险区域
+                // 移动的危险区域，需要时间扭曲来躲避
                 this.hazards.push(
-                    { x: 120, y: 520, width: 180, height: 20, dimension: 0, type: 'laser' },
-                    { x: 380, y: 500, width: 120, height: 20, dimension: 0, type: 'laser' },
-                    { x: 200, y: 450, width: 100, height: 20, dimension: 0, type: 'laser' },
-                    { x: 500, y: 420, width: 150, height: 20, dimension: 0, type: 'laser' },
-                    { x: 150, y: 350, width: 100, height: 20, dimension: 0, type: 'laser' },
-                    { x: 300, y: 250, width: 200, height: 20, dimension: 0, type: 'laser' }
+                    { x: 200, y: 520, width: 80, height: 20, dimension: 0, type: 'laser' },
+                    { x: 350, y: 430, width: 100, height: 20, dimension: 0, type: 'laser' },
+                    { x: 100, y: 300, width: 100, height: 20, dimension: 0, type: 'laser' },
+                    { x: 450, y: 200, width: 80, height: 20, dimension: 0, type: 'laser' }
                 );
                 
+                // 分布需要精确跳跃的收集品
                 this.collectibles.push(
-                    { x: 335, y: 450, width: 15, height: 15, collected: false },
-                    { x: 180, y: 370, width: 15, height: 15, collected: false },
-                    { x: 480, y: 330, width: 15, height: 15, collected: false },
-                    { x: 275, y: 250, width: 15, height: 15, collected: false },
-                    { x: 575, y: 250, width: 15, height: 15, collected: false },
-                    { x: 430, y: 150, width: 15, height: 15, collected: false },
-                    { x: 685, y: 100, width: 15, height: 15, collected: false }
+                    { x: 335, y: 430, width: 15, height: 15, collected: false },
+                    { x: 530, y: 350, width: 15, height: 15, collected: false }, // 需要使用时间扭曲
+                    { x: 230, y: 300, width: 15, height: 15, collected: false },
+                    { x: 430, y: 230, width: 15, height: 15, collected: false }, // 需要使用时间扭曲
+                    { x: 630, y: 170, width: 15, height: 15, collected: false },
+                    { x: 330, y: 100, width: 15, height: 15, collected: false }  // 终点收集品
                 );
                 break;
                 
             case 7:
-                // 第7关：复杂的多维度平台网络
+                // 第7关：能量场冒险 - 探索能量场维度的特殊效果
                 this.platforms.push(
-                    { x: 0, y: 550, width: 80, height: 50, dimension: 0 }, // 非常窄的起始平台
-                    { x: 200, y: 520, width: 60, height: 20, dimension: 3 }, // 能量场平台
-                    { x: 100, y: 450, width: 50, height: 20, dimension: 1 }, // 反重力平台
-                    { x: 350, y: 450, width: 50, height: 20, dimension: 2 }, // 时间扭曲平台
-                    { x: 200, y: 380, width: 40, height: 20, dimension: 0 }, // 极窄的平台
-                    { x: 500, y: 400, width: 60, height: 20, dimension: 3 }, // 能量场平台
-                    { x: 300, y: 320, width: 50, height: 20, dimension: 1 }, // 反重力平台
-                    { x: 600, y: 350, width: 40, height: 20, dimension: 0 }, // 极窄的平台
-                    { x: 450, y: 280, width: 60, height: 20, dimension: 2 }, // 时间扭曲平台
-                    { x: 250, y: 220, width: 50, height: 20, dimension: 0 },
-                    { x: 550, y: 220, width: 40, height: 20, dimension: 3 }, // 能量场平台
-                    { x: 400, y: 150, width: 60, height: 20, dimension: 1 }, // 反重力平台
-                    { x: 700, y: 200, width: 50, height: 20, dimension: 0 }
+                    { x: 0, y: 550, width: 150, height: 50, dimension: 0 },
+                    { x: 300, y: 450, width: 120, height: 20, dimension: 3 }, // 能量场平台 - 重点体验
+                    { x: 150, y: 350, width: 100, height: 20, dimension: 0 },
+                    { x: 450, y: 300, width: 120, height: 20, dimension: 3 }, // 能量场平台 - 重点体验
+                    { x: 250, y: 220, width: 100, height: 20, dimension: 0 },
+                    { x: 550, y: 200, width: 100, height: 20, dimension: 3 }, // 能量场平台 - 重点体验
+                    { x: 400, y: 100, width: 120, height: 20, dimension: 0 }  // 终点平台
                 );
                 
-                // 大量动态红色方块
+                // 策略性放置的危险区域，让玩家利用能量场特性
                 this.hazards.push(
-                    { x: 100, y: 530, width: 100, height: 20, dimension: 0, type: 'laser' },
-                    { x: 270, y: 520, width: 150, height: 20, dimension: 0, type: 'laser' },
-                    { x: 150, y: 480, width: 200, height: 20, dimension: 0, type: 'laser' },
-                    { x: 420, y: 480, width: 120, height: 20, dimension: 0, type: 'laser' },
-                    { x: 580, y: 450, width: 100, height: 20, dimension: 0, type: 'laser' },
-                    { x: 250, y: 420, width: 200, height: 20, dimension: 0, type: 'laser' },
-                    { x: 100, y: 350, width: 100, height: 20, dimension: 0, type: 'laser' },
-                    { x: 400, y: 350, width: 100, height: 20, dimension: 0, type: 'laser' },
-                    { x: 650, y: 300, width: 100, height: 20, dimension: 0, type: 'laser' },
-                    { x: 150, y: 280, width: 150, height: 20, dimension: 0, type: 'laser' },
-                    { x: 350, y: 250, width: 200, height: 20, dimension: 0, type: 'laser' },
-                    { x: 500, y: 180, width: 150, height: 20, dimension: 0, type: 'laser' }
+                    { x: 180, y: 500, width: 100, height: 20, dimension: 0, type: 'laser' },
+                    { x: 400, y: 400, width: 100, height: 20, dimension: 0, type: 'laser' },
+                    { x: 300, y: 350, width: 150, height: 20, dimension: 0, type: 'laser' },
+                    { x: 500, y: 150, width: 100, height: 20, dimension: 0, type: 'laser' }
                 );
                 
+                // 利用能量场推动效果可达的收集品
                 this.collectibles.push(
-                    { x: 230, y: 470, width: 15, height: 15, collected: false },
-                    { x: 125, y: 400, width: 15, height: 15, collected: false },
-                    { x: 375, y: 400, width: 15, height: 15, collected: false },
-                    { x: 220, y: 330, width: 15, height: 15, collected: false },
-                    { x: 530, y: 350, width: 15, height: 15, collected: false },
-                    { x: 325, y: 270, width: 15, height: 15, collected: false },
-                    { x: 620, y: 300, width: 15, height: 15, collected: false },
-                    { x: 480, y: 230, width: 15, height: 15, collected: false },
-                    { x: 275, y: 170, width: 15, height: 15, collected: false },
-                    { x: 570, y: 170, width: 15, height: 15, collected: false },
-                    { x: 430, y: 100, width: 15, height: 15, collected: false },
-                    { x: 725, y: 150, width: 15, height: 15, collected: false }
+                    { x: 350, y: 400, width: 15, height: 15, collected: false }, // 利用能量场
+                    { x: 180, y: 300, width: 15, height: 15, collected: false },
+                    { x: 480, y: 250, width: 15, height: 15, collected: false }, // 利用能量场
+                    { x: 280, y: 170, width: 15, height: 15, collected: false },
+                    { x: 580, y: 150, width: 15, height: 15, collected: false }, // 利用能量场
+                    { x: 430, y: 50, width: 15, height: 15, collected: false }  // 终点收集品
                 );
                 break;
                 
             case 8:
-                // 第8关：垂直挑战，利用反重力和其他维度
+                // 第8关：维度交错 - 让四种维度有机结合
                 this.platforms.push(
-                    { x: 0, y: 550, width: 100, height: 50, dimension: 0 },
-                    { x: 200, y: 520, width: 50, height: 20, dimension: 0 },
-                    { x: 400, y: 500, width: 50, height: 20, dimension: 3 }, // 能量场平台
-                    { x: 300, y: 450, width: 60, height: 20, dimension: 1 }, // 反重力平台
-                    { x: 100, y: 420, width: 40, height: 20, dimension: 2 }, // 时间扭曲平台
-                    { x: 500, y: 400, width: 50, height: 20, dimension: 0 },
-                    { x: 200, y: 350, width: 40, height: 20, dimension: 1 }, // 反重力平台
-                    { x: 400, y: 320, width: 60, height: 20, dimension: 3 }, // 能量场平台
-                    { x: 300, y: 270, width: 40, height: 20, dimension: 2 }, // 时间扭曲平台
-                    { x: 600, y: 250, width: 50, height: 20, dimension: 0 },
-                    { x: 100, y: 220, width: 40, height: 20, dimension: 1 }, // 反重力平台
-                    { x: 400, y: 200, width: 40, height: 20, dimension: 0 },
-                    { x: 500, y: 150, width: 60, height: 20, dimension: 3 }, // 能量场平台
-                    { x: 300, y: 100, width: 50, height: 20, dimension: 2 }, // 时间扭曲平台
-                    { x: 700, y: 100, width: 50, height: 20, dimension: 0 }
+                    { x: 0, y: 550, width: 180, height: 50, dimension: 0 }, // 宽敞起始平台
+                    { x: 300, y: 500, width: 100, height: 20, dimension: 1 }, // 反重力平台
+                    { x: 500, y: 450, width: 100, height: 20, dimension: 2 }, // 时间扭曲平台
+                    { x: 200, y: 400, width: 100, height: 20, dimension: 3 }, // 能量场平台
+                    { x: 400, y: 350, width: 100, height: 20, dimension: 0 }, // 正常平台
+                    { x: 600, y: 300, width: 100, height: 20, dimension: 1 }, // 反重力平台
+                    { x: 300, y: 250, width: 100, height: 20, dimension: 2 }, // 时间扭曲平台
+                    { x: 500, y: 200, width: 100, height: 20, dimension: 3 }, // 能量场平台
+                    { x: 200, y: 150, width: 100, height: 20, dimension: 0 }, // 正常平台 - 终点
+                    { x: 400, y: 100, width: 100, height: 20, dimension: 0 }  // 正常平台 - 终点
                 );
                 
-                // 密集的危险区域
+                // 合理分布的危险区域，需要切换维度来躲避
                 this.hazards.push(
-                    { x: 120, y: 530, width: 150, height: 20, dimension: 0, type: 'laser' },
-                    { x: 470, y: 520, width: 150, height: 20, dimension: 0, type: 'laser' },
-                    { x: 150, y: 480, width: 200, height: 20, dimension: 0, type: 'laser' },
-                    { x: 350, y: 480, width: 250, height: 20, dimension: 0, type: 'laser' },
-                    { x: 0, y: 450, width: 150, height: 20, dimension: 0, type: 'laser' },
-                    { x: 350, y: 420, width: 200, height: 20, dimension: 0, type: 'laser' },
-                    { x: 250, y: 380, width: 250, height: 20, dimension: 0, type: 'laser' },
-                    { x: 550, y: 350, width: 150, height: 20, dimension: 0, type: 'laser' },
-                    { x: 100, y: 320, width: 250, height: 20, dimension: 0, type: 'laser' },
-                    { x: 450, y: 300, width: 200, height: 20, dimension: 0, type: 'laser' },
-                    { x: 200, y: 250, width: 150, height: 20, dimension: 0, type: 'laser' },
-                    { x: 350, y: 220, width: 200, height: 20, dimension: 0, type: 'laser' },
-                    { x: 550, y: 200, width: 150, height: 20, dimension: 0, type: 'laser' },
-                    { x: 150, y: 180, width: 300, height: 20, dimension: 0, type: 'laser' },
-                    { x: 500, y: 120, width: 200, height: 20, dimension: 0, type: 'laser' },
-                    { x: 350, y: 70, width: 150, height: 20, dimension: 0, type: 'laser' }
+                    { x: 200, y: 530, width: 80, height: 20, dimension: 0, type: 'laser' },
+                    { x: 400, y: 480, width: 80, height: 20, dimension: 0, type: 'laser' },
+                    { x: 100, y: 430, width: 100, height: 20, dimension: 0, type: 'laser' },
+                    { x: 300, y: 380, width: 100, height: 20, dimension: 0, type: 'laser' },
+                    { x: 500, y: 330, width: 100, height: 20, dimension: 0, type: 'laser' },
+                    { x: 200, y: 280, width: 100, height: 20, dimension: 0, type: 'laser' },
+                    { x: 400, y: 230, width: 100, height: 20, dimension: 0, type: 'laser' }
                 );
                 
+                // 每个维度区域都有收集品，鼓励全面使用所有维度
                 this.collectibles.push(
-                    { x: 225, y: 470, width: 15, height: 15, collected: false },
-                    { x: 425, y: 450, width: 15, height: 15, collected: false },
-                    { x: 325, y: 400, width: 15, height: 15, collected: false },
-                    { x: 120, y: 370, width: 15, height: 15, collected: false },
-                    { x: 525, y: 350, width: 15, height: 15, collected: false },
-                    { x: 220, y: 300, width: 15, height: 15, collected: false },
-                    { x: 425, y: 270, width: 15, height: 15, collected: false },
-                    { x: 320, y: 220, width: 15, height: 15, collected: false },
-                    { x: 625, y: 200, width: 15, height: 15, collected: false },
-                    { x: 120, y: 170, width: 15, height: 15, collected: false },
-                    { x: 420, y: 150, width: 15, height: 15, collected: false },
-                    { x: 530, y: 100, width: 15, height: 15, collected: false },
-                    { x: 325, y: 50, width: 15, height: 15, collected: false },
-                    { x: 725, y: 50, width: 15, height: 15, collected: false }
+                    { x: 330, y: 450, width: 15, height: 15, collected: false }, // 反重力区域
+                    { x: 530, y: 400, width: 15, height: 15, collected: false }, // 时间扭曲区域
+                    { x: 230, y: 350, width: 15, height: 15, collected: false }, // 能量场区域
+                    { x: 430, y: 300, width: 15, height: 15, collected: false }, // 正常区域
+                    { x: 630, y: 250, width: 15, height: 15, collected: false }, // 反重力区域
+                    { x: 330, y: 200, width: 15, height: 15, collected: false }, // 时间扭曲区域
+                    { x: 530, y: 150, width: 15, height: 15, collected: false }, // 能量场区域
+                    { x: 230, y: 100, width: 15, height: 15, collected: false }, // 终点收集品
+                    { x: 430, y: 50, width: 15, height: 15, collected: false }   // 终点收集品
                 );
                 break;
                 
             case 9:
-                // 第9关：复杂的平台组合，需要精确跳跃和维度切换
+                // 第9关：平衡挑战 - 考验玩家在不同维度间的切换能力
                 this.platforms.push(
-                    { x: 0, y: 550, width: 80, height: 50, dimension: 0 }, // 极窄起始平台
-                    { x: 250, y: 530, width: 40, height: 20, dimension: 3 }, // 能量场平台
-                    { x: 500, y: 530, width: 40, height: 20, dimension: 0 },
-                    { x: 120, y: 480, width: 60, height: 20, dimension: 1 }, // 反重力平台
-                    { x: 350, y: 480, width: 60, height: 20, dimension: 2 }, // 时间扭曲平台
-                    { x: 600, y: 480, width: 50, height: 20, dimension: 0 },
-                    { x: 200, y: 430, width: 50, height: 20, dimension: 3 }, // 能量场平台
-                    { x: 450, y: 430, width: 40, height: 20, dimension: 1 }, // 反重力平台
-                    { x: 100, y: 380, width: 50, height: 20, dimension: 0 },
-                    { x: 300, y: 380, width: 40, height: 20, dimension: 2 }, // 时间扭曲平台
-                    { x: 550, y: 380, width: 50, height: 20, dimension: 3 }, // 能量场平台
-                    { x: 180, y: 330, width: 40, height: 20, dimension: 1 }, // 反重力平台
-                    { x: 400, y: 330, width: 60, height: 20, dimension: 0 },
-                    { x: 650, y: 330, width: 50, height: 20, dimension: 2 }, // 时间扭曲平台
-                    { x: 250, y: 280, width: 50, height: 20, dimension: 3 }, // 能量场平台
-                    { x: 500, y: 280, width: 40, height: 20, dimension: 1 }, // 反重力平台
-                    { x: 120, y: 230, width: 50, height: 20, dimension: 0 },
-                    { x: 350, y: 230, width: 40, height: 20, dimension: 2 }, // 时间扭曲平台
-                    { x: 600, y: 230, width: 50, height: 20, dimension: 3 }, // 能量场平台
-                    { x: 200, y: 180, width: 60, height: 20, dimension: 1 }, // 反重力平台
-                    { x: 450, y: 180, width: 50, height: 20, dimension: 0 },
-                    { x: 100, y: 130, width: 40, height: 20, dimension: 3 }, // 能量场平台
-                    { x: 300, y: 130, width: 50, height: 20, dimension: 2 }, // 时间扭曲平台
-                    { x: 550, y: 130, width: 60, height: 20, dimension: 1 }, // 反重力平台
-                    { x: 200, y: 80, width: 50, height: 20, dimension: 0 },
-                    { x: 450, y: 80, width: 40, height: 20, dimension: 3 }, // 能量场平台
-                    { x: 700, y: 80, width: 50, height: 20, dimension: 2 }  // 时间扭曲平台
+                    { x: 0, y: 550, width: 200, height: 50, dimension: 0 }, // 宽敞起始平台
+                    { x: 400, y: 520, width: 120, height: 20, dimension: 0 },
+                    { x: 200, y: 450, width: 100, height: 20, dimension: 3 }, // 能量场平台
+                    { x: 500, y: 400, width: 100, height: 20, dimension: 1 }, // 反重力平台
+                    { x: 300, y: 350, width: 100, height: 20, dimension: 2 }, // 时间扭曲平台
+                    { x: 600, y: 300, width: 120, height: 20, dimension: 0 },
+                    { x: 400, y: 250, width: 100, height: 20, dimension: 3 }, // 能量场平台
+                    { x: 150, y: 200, width: 100, height: 20, dimension: 1 }, // 反重力平台
+                    { x: 500, y: 150, width: 100, height: 20, dimension: 2 }, // 时间扭曲平台
+                    { x: 300, y: 100, width: 150, height: 20, dimension: 0 }  // 宽敞终点平台
                 );
                 
-                // 极其密集的危险区域网络
+                // 精心设计的危险区域，需要精确切换维度
                 this.hazards.push(
-                    // 底部危险区域
-                    { x: 100, y: 540, width: 200, height: 20, dimension: 0, type: 'laser' },
-                    { x: 350, y: 540, width: 200, height: 20, dimension: 0, type: 'laser' },
-                    { x: 550, y: 540, width: 200, height: 20, dimension: 0, type: 'laser' },
-                    // 第二层危险区域
-                    { x: 0, y: 500, width: 150, height: 20, dimension: 0, type: 'laser' },
-                    { x: 180, y: 500, width: 220, height: 20, dimension: 0, type: 'laser' },
-                    { x: 420, y: 500, width: 230, height: 20, dimension: 0, type: 'laser' },
-                    { x: 670, y: 500, width: 100, height: 20, dimension: 0, type: 'laser' },
-                    // 第三层危险区域
-                    { x: 100, y: 450, width: 200, height: 20, dimension: 0, type: 'laser' },
-                    { x: 320, y: 450, width: 180, height: 20, dimension: 0, type: 'laser' },
-                    { x: 520, y: 450, width: 250, height: 20, dimension: 0, type: 'laser' },
-                    // 第四层危险区域
-                    { x: 0, y: 400, width: 150, height: 20, dimension: 0, type: 'laser' },
-                    { x: 200, y: 400, width: 200, height: 20, dimension: 0, type: 'laser' },
-                    { x: 420, y: 400, width: 180, height: 20, dimension: 0, type: 'laser' },
-                    { x: 620, y: 400, width: 150, height: 20, dimension: 0, type: 'laser' },
-                    // 第五层危险区域
-                    { x: 100, y: 350, width: 150, height: 20, dimension: 0, type: 'laser' },
-                    { x: 270, y: 350, width: 230, height: 20, dimension: 0, type: 'laser' },
-                    { x: 520, y: 350, width: 250, height: 20, dimension: 0, type: 'laser' },
-                    // 第六层危险区域
-                    { x: 0, y: 300, width: 200, height: 20, dimension: 0, type: 'laser' },
-                    { x: 230, y: 300, width: 270, height: 20, dimension: 0, type: 'laser' },
-                    { x: 520, y: 300, width: 250, height: 20, dimension: 0, type: 'laser' },
-                    // 第七层危险区域
-                    { x: 100, y: 250, width: 200, height: 20, dimension: 0, type: 'laser' },
-                    { x: 320, y: 250, width: 180, height: 20, dimension: 0, type: 'laser' },
-                    { x: 520, y: 250, width: 250, height: 20, dimension: 0, type: 'laser' },
-                    // 第八层危险区域
-                    { x: 0, y: 200, width: 150, height: 20, dimension: 0, type: 'laser' },
-                    { x: 180, y: 200, width: 220, height: 20, dimension: 0, type: 'laser' },
-                    { x: 420, y: 200, width: 230, height: 20, dimension: 0, type: 'laser' },
-                    // 第九层危险区域
-                    { x: 100, y: 150, width: 200, height: 20, dimension: 0, type: 'laser' },
-                    { x: 320, y: 150, width: 180, height: 20, dimension: 0, type: 'laser' },
-                    { x: 520, y: 150, width: 250, height: 20, dimension: 0, type: 'laser' },
-                    // 顶层危险区域
-                    { x: 0, y: 100, width: 150, height: 20, dimension: 0, type: 'laser' },
-                    { x: 180, y: 100, width: 270, height: 20, dimension: 0, type: 'laser' },
-                    { x: 470, y: 100, width: 250, height: 20, dimension: 0, type: 'laser' }
+                    { x: 220, y: 530, width: 150, height: 20, dimension: 0, type: 'laser' },
+                    { x: 100, y: 480, width: 120, height: 20, dimension: 0, type: 'laser' },
+                    { x: 350, y: 430, width: 150, height: 20, dimension: 0, type: 'laser' },
+                    { x: 200, y: 380, width: 120, height: 20, dimension: 0, type: 'laser' },
+                    { x: 450, y: 330, width: 150, height: 20, dimension: 0, type: 'laser' },
+                    { x: 100, y: 280, width: 120, height: 20, dimension: 0, type: 'laser' },
+                    { x: 350, y: 230, width: 120, height: 20, dimension: 0, type: 'laser' },
+                    { x: 200, y: 180, width: 120, height: 20, dimension: 0, type: 'laser' },
+                    { x: 450, y: 130, width: 120, height: 20, dimension: 0, type: 'laser' }
                 );
                 
+                // 合理分布的收集品，需要在各维度间灵活切换
                 this.collectibles.push(
-                    { x: 270, y: 480, width: 15, height: 15, collected: false },
-                    { x: 520, y: 480, width: 15, height: 15, collected: false },
-                    { x: 150, y: 430, width: 15, height: 15, collected: false },
-                    { x: 375, y: 430, width: 15, height: 15, collected: false },
-                    { x: 625, y: 430, width: 15, height: 15, collected: false },
-                    { x: 225, y: 380, width: 15, height: 15, collected: false },
-                    { x: 470, y: 380, width: 15, height: 15, collected: false },
-                    { x: 125, y: 330, width: 15, height: 15, collected: false },
-                    { x: 320, y: 330, width: 15, height: 15, collected: false },
-                    { x: 575, y: 330, width: 15, height: 15, collected: false },
-                    { x: 190, y: 280, width: 15, height: 15, collected: false },
-                    { x: 425, y: 280, width: 15, height: 15, collected: false },
-                    { x: 675, y: 280, width: 15, height: 15, collected: false },
-                    { x: 275, y: 230, width: 15, height: 15, collected: false },
-                    { x: 520, y: 230, width: 15, height: 15, collected: false },
-                    { x: 125, y: 180, width: 15, height: 15, collected: false },
-                    { x: 375, y: 180, width: 15, height: 15, collected: false },
-                    { x: 625, y: 180, width: 15, height: 15, collected: false },
-                    { x: 120, y: 130, width: 15, height: 15, collected: false },
-                    { x: 325, y: 130, width: 15, height: 15, collected: false },
-                    { x: 575, y: 130, width: 15, height: 15, collected: false },
-                    { x: 225, y: 80, width: 15, height: 15, collected: false },
-                    { x: 470, y: 80, width: 15, height: 15, collected: false },
-                    { x: 725, y: 80, width: 15, height: 15, collected: false }
+                    { x: 430, y: 470, width: 15, height: 15, collected: false },
+                    { x: 230, y: 400, width: 15, height: 15, collected: false }, // 能量场区域
+                    { x: 530, y: 350, width: 15, height: 15, collected: false }, // 反重力区域
+                    { x: 330, y: 300, width: 15, height: 15, collected: false }, // 时间扭曲区域
+                    { x: 630, y: 250, width: 15, height: 15, collected: false },
+                    { x: 430, y: 200, width: 15, height: 15, collected: false }, // 能量场区域
+                    { x: 180, y: 150, width: 15, height: 15, collected: false }, // 反重力区域
+                    { x: 530, y: 100, width: 15, height: 15, collected: false }, // 时间扭曲区域
+                    { x: 350, y: 50, width: 15, height: 15, collected: false }   // 终点收集品
                 );
                 break;
                 
             case 10:
-                // 第10关：最终挑战，完美结合所有维度特性
+                // 第10关：维度大师 - 综合运用所有维度，体验游戏精髓
                 this.platforms.push(
-                    { x: 0, y: 550, width: 60, height: 50, dimension: 0 }, // 最窄起始平台
-                    { x: 300, y: 520, width: 50, height: 20, dimension: 3 }, // 能量场平台
-                    { x: 600, y: 520, width: 40, height: 20, dimension: 0 },
-                    { x: 150, y: 480, width: 40, height: 20, dimension: 1 }, // 反重力平台
-                    { x: 450, y: 480, width: 50, height: 20, dimension: 2 }, // 时间扭曲平台
-                    { x: 50, y: 440, width: 50, height: 20, dimension: 0 },
-                    { x: 250, y: 440, width: 40, height: 20, dimension: 3 }, // 能量场平台
-                    { x: 550, y: 440, width: 40, height: 20, dimension: 1 }, // 反重力平台
-                    { x: 350, y: 400, width: 60, height: 20, dimension: 0 },
-                    { x: 100, y: 360, width: 50, height: 20, dimension: 2 }, // 时间扭曲平台
-                    { x: 450, y: 360, width: 50, height: 20, dimension: 3 }, // 能量场平台
-                    { x: 700, y: 360, width: 50, height: 20, dimension: 0 },
-                    { x: 200, y: 320, width: 40, height: 20, dimension: 1 }, // 反重力平台
-                    { x: 550, y: 320, width: 50, height: 20, dimension: 2 }, // 时间扭曲平台
-                    { x: 300, y: 280, width: 50, height: 20, dimension: 0 },
-                    { x: 50, y: 240, width: 40, height: 20, dimension: 3 }, // 能量场平台
-                    { x: 400, y: 240, width: 50, height: 20, dimension: 1 }, // 反重力平台
-                    { x: 650, y: 240, width: 40, height: 20, dimension: 0 },
-                    { x: 200, y: 200, width: 60, height: 20, dimension: 2 }, // 时间扭曲平台
-                    { x: 350, y: 200, width: 40, height: 20, dimension: 3 }, // 能量场平台
-                    { x: 550, y: 200, width: 50, height: 20, dimension: 1 }, // 反重力平台
-                    { x: 100, y: 160, width: 50, height: 20, dimension: 0 },
-                    { x: 250, y: 160, width: 40, height: 20, dimension: 2 }, // 时间扭曲平台
-                    { x: 450, y: 160, width: 50, height: 20, dimension: 3 }, // 能量场平台
-                    { x: 600, y: 160, width: 40, height: 20, dimension: 1 }, // 反重力平台
-                    { x: 350, y: 120, width: 60, height: 20, dimension: 0 },
-                    { x: 50, y: 80, width: 50, height: 20, dimension: 2 }, // 时间扭曲平台
-                    { x: 200, y: 80, width: 50, height: 20, dimension: 3 }, // 能量场平台
-                    { x: 450, y: 80, width: 40, height: 20, dimension: 1 }, // 反重力平台
-                    { x: 700, y: 80, width: 50, height: 20, dimension: 0 },
-                    { x: 300, y: 40, width: 50, height: 20, dimension: 2 }  // 时间扭曲平台 - 终点
+                    { x: 0, y: 550, width: 250, height: 50, dimension: 0 }, // 非常宽敞的起始平台
+                    { x: 400, y: 500, width: 150, height: 20, dimension: 1 }, // 反重力平台
+                    { x: 150, y: 450, width: 120, height: 20, dimension: 2 }, // 时间扭曲平台
+                    { x: 500, y: 400, width: 120, height: 20, dimension: 3 }, // 能量场平台
+                    { x: 300, y: 350, width: 150, height: 20, dimension: 0 }, // 宽敞正常平台
+                    { x: 600, y: 300, width: 120, height: 20, dimension: 1 }, // 反重力平台
+                    { x: 200, y: 250, width: 120, height: 20, dimension: 2 }, // 时间扭曲平台
+                    { x: 450, y: 200, width: 150, height: 20, dimension: 3 }, // 能量场平台
+                    { x: 300, y: 120, width: 200, height: 20, dimension: 0 }  // 宽敞终点平台
                 );
                 
-                // 极端密集的危险区域布局
-                this.hazards = [];
-                // 生成多层交错的危险区域网络
-                for (let y = 540; y >= 20; y -= 40) {
-                    const numHazards = 3 + Math.floor(Math.random() * 2);
-                    const positions = [];
-                    
-                    // 确保危险区域之间有足够的间隙供平台放置
-                    for (let i = 0; i < numHazards; i++) {
-                        let x;
-                        let valid = false;
-                        
-                        // 尝试找到有效的位置
-                        for (let attempts = 0; attempts < 10; attempts++) {
-                            x = Math.random() * (this.canvas.width - 100);
-                            valid = true;
-                            
-                            // 检查与现有危险区域的冲突
-                            for (const pos of positions) {
-                                if (Math.abs(x - pos) < 120) {
-                                    valid = false;
-                                    break;
-                                }
-                            }
-                            
-                            if (valid) break;
-                        }
-                        
-                        if (valid) {
-                            positions.push(x);
-                            this.hazards.push({
-                                x: x,
-                                y: y,
-                                width: 80 + Math.random() * 40,
-                                height: 20,
-                                dimension: 0,
-                                type: 'laser'
-                            });
-                        }
-                    }
-                }
+                // 策略性放置的危险区域，考验维度掌握
+                this.hazards.push(
+                    { x: 270, y: 530, width: 100, height: 20, dimension: 0, type: 'laser' },
+                    { x: 100, y: 480, width: 100, height: 20, dimension: 0, type: 'laser' },
+                    { x: 400, y: 430, width: 120, height: 20, dimension: 0, type: 'laser' },
+                    { x: 200, y: 380, width: 100, height: 20, dimension: 0, type: 'laser' },
+                    { x: 450, y: 330, width: 100, height: 20, dimension: 0, type: 'laser' },
+                    { x: 100, y: 280, width: 100, height: 20, dimension: 0, type: 'laser' },
+                    { x: 500, y: 250, width: 100, height: 20, dimension: 0, type: 'laser' },
+                    { x: 350, y: 170, width: 100, height: 20, dimension: 0, type: 'laser' }
+                );
                 
-                // 添加额外的危险区域以增加难度
-                for (let i = 0; i < 15; i++) {
-                    this.hazards.push({
-                        x: Math.random() * (this.canvas.width - 100),
-                        y: 40 + Math.random() * 480,
-                        width: 60 + Math.random() * 60,
-                        height: 20,
-                        dimension: 0,
-                        type: 'laser'
-                    });
-                }
-                
-                // 大量收集品，分布在各个位置
-                this.collectibles = [];
-                for (let i = 0; i < 30; i++) {
-                    // 确保收集品不会生成在危险区域上
-                    let validPos = false;
-                    let x, y;
-                    
-                    while (!validPos) {
-                        x = 50 + Math.random() * (this.canvas.width - 100);
-                        y = 60 + Math.random() * 440;
-                        validPos = true;
-                        
-                        // 检查与危险区域的冲突
-                        for (const hazard of this.hazards) {
-                            if (x >= hazard.x - 20 && x <= hazard.x + hazard.width + 20 &&
-                                y >= hazard.y - 20 && y <= hazard.y + hazard.height + 20) {
-                                validPos = false;
-                                break;
-                            }
-                        }
-                    }
-                    
-                    this.collectibles.push({
-                        x: x,
-                        y: y,
-                        width: 15,
-                        height: 15,
-                        collected: false
-                    });
-                }
+                // 每个维度都有收集品，鼓励全面体验游戏
+                this.collectibles.push(
+                    { x: 450, y: 450, width: 15, height: 15, collected: false }, // 反重力区域
+                    { x: 180, y: 400, width: 15, height: 15, collected: false }, // 时间扭曲区域
+                    { x: 530, y: 350, width: 15, height: 15, collected: false }, // 能量场区域
+                    { x: 350, y: 300, width: 15, height: 15, collected: false }, // 正常区域
+                    { x: 630, y: 250, width: 15, height: 15, collected: false }, // 反重力区域
+                    { x: 230, y: 200, width: 15, height: 15, collected: false }, // 时间扭曲区域
+                    { x: 480, y: 150, width: 15, height: 15, collected: false }, // 能量场区域
+                    { x: 350, y: 70, width: 15, height: 15, collected: false }, // 终点收集品
+                    { x: 450, y: 70, width: 15, height: 15, collected: false }  // 终点收集品
+                );
+                break;
                 break;
                 
             default:
