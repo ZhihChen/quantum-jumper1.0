@@ -347,12 +347,16 @@ class QuantumJumper {
     loadLevel(level) {
         console.log(`=== loadLevel(${level}) called ===`);
         
+        // 关键：每关开始时，重置当前关卡的收集品数组（但不重置累计的quantumShards）
         this.platforms = [];
-        this.collectibles = [];
+        this.collectibles = []; // 重置当前关卡收集品数组
         this.hazards = [];
         this.portals = [];
         this.levelCompleteTriggered = false; // 重置关卡完成标志
         this.upperBoundWarningTime = 0; // 重置上界警告时间
+        
+        // 注意：quantumShards 是累计的，不会在这里重置
+        console.log(`Loading level ${level} (累计量子碎片: ${this.quantumShards})`);
         
         // 如果是4-10关，增加重启计数（用于随机变化）
         // 注意：每次重新加载同一关时（比如能量耗尽重启），都会增加计数
@@ -407,18 +411,31 @@ class QuantumJumper {
                 }
         }
         
-        // 验证关卡加载结果
+        // 验证关卡加载结果 - 确保当前关卡的所有收集品都正确初始化
         console.log(`Level ${level} loaded successfully:`);
         console.log(`- Platforms: ${this.platforms.length}`);
-        console.log(`- Collectibles: ${this.collectibles.length}`);
+        console.log(`- Current level collectibles: ${this.collectibles.length}`);
+        console.log(`- Total quantum shards (accumulated): ${this.quantumShards}`);
+        
         if (this.collectibles.length > 0) {
-            const allUncollected = this.collectibles.every(c => c.collected === false);
-            console.log(`- All collectibles initialized with collected=false: ${allUncollected}`);
-            if (!allUncollected) {
-                // 强制重置所有收集品状态
-                this.collectibles.forEach(c => c.collected = false);
-                console.warn(`- Fixed: Reset all collectibles to collected=false`);
+            // 强制确保所有收集品的collected状态都是false
+            let fixed = 0;
+            this.collectibles.forEach((c, idx) => {
+                if (c.collected !== false) {
+                    c.collected = false;
+                    fixed++;
+                }
+            });
+            
+            if (fixed > 0) {
+                console.warn(`- Fixed: Reset ${fixed} collectibles to collected=false`);
             }
+            
+            const allUncollected = this.collectibles.every(c => c.collected === false);
+            console.log(`- All collectibles in current level initialized with collected=false: ${allUncollected}`);
+            
+            // 验证：确保所有收集品都是当前关卡新创建的
+            console.log(`✓ Current level ${level} collectibles ready (will be checked independently for completion)`);
         } else {
             console.error(`- ERROR: No collectibles in level ${level}!`);
         }
@@ -956,17 +973,36 @@ class QuantumJumper {
             }
         });
         
-        // 收集品碰撞
+        // 收集品碰撞 - 只处理当前关卡内的收集品
         this.collectibles.forEach((collectible, index) => {
-            if (!collectible.collected && this.isColliding(this.player, collectible)) {
+            // 确保collectible有collected属性
+            if (collectible.collected === undefined || collectible.collected === null) {
+                collectible.collected = false;
+            }
+            
+            // 检查碰撞：当前关卡内的收集品且还未收集
+            if (collectible.collected !== true && this.isColliding(this.player, collectible)) {
+                // 标记当前关卡的这个收集品为已收集
                 collectible.collected = true;
+                
+                // 累计量子碎片（全局累计）
                 this.quantumShards++;
+                
+                // 恢复能量
                 this.energy = Math.min(this.energy + 10, this.maxEnergy);
+                
+                // 创建收集效果
                 this.createCollectionEffect(collectible);
                 
-                // 调试信息
-                const remaining = this.collectibles.filter(c => !c.collected).length;
-                console.log(`Collected shard! ${remaining} remaining in level ${this.currentLevel}`);
+                // 调试信息：显示当前关卡进度和累计总数
+                const remainingInCurrentLevel = this.collectibles.filter(c => c.collected !== true).length;
+                const totalInCurrentLevel = this.collectibles.length;
+                console.log(`✓ Collected shard in level ${this.currentLevel}: ${totalInCurrentLevel - remainingInCurrentLevel}/${totalInCurrentLevel} (总量子碎片: ${this.quantumShards})`);
+                
+                // 如果当前关卡全部收集完成
+                if (remainingInCurrentLevel === 0) {
+                    console.log(`🎉 Level ${this.currentLevel} all ${totalInCurrentLevel} collectibles collected!`);
+                }
             }
         });
         
@@ -1065,7 +1101,15 @@ class QuantumJumper {
     gameOver() {
         this.gameState = 'menu';
         document.getElementById('gameOverlay').classList.remove('hidden');
-        // 不重置关卡，保持当前关卡，这样玩家再次开始游戏时会从当前关卡继续
+        
+        // 重要：不重置当前关卡，保持当前关卡
+        // 不重置量子碎片（quantumShards），保持累计值
+        // 只重置当前关卡的状态标志
+        
+        console.log(`Game over at level ${this.currentLevel}`);
+        console.log(`- Current level will be restarted (collectibles will be reset)`);
+        console.log(`- Quantum shards (累计) remain: ${this.quantumShards}`);
+        
         // 如果是4-10关，增加重启计数，下次加载时会有随机变化
         if (this.currentLevel >= 4 && this.currentLevel <= 10) {
             if (!this.levelRestartCount[this.currentLevel]) {
@@ -1073,6 +1117,10 @@ class QuantumJumper {
             }
             this.levelRestartCount[this.currentLevel]++; // 增加重启计数
         }
+        
+        // 注意：收集品数组会在startGame -> loadLevel时重置
+        // 量子碎片不会重置（累计值）
+        
         // 能量会在startGame时恢复
         this.updateUI();
     }
@@ -1088,29 +1136,62 @@ class QuantumJumper {
             return;
         }
         
-        // 检查收集状态
-        const uncollectedCount = this.collectibles.filter(c => !c.collected).length;
-        const collectedCount = this.collectibles.filter(c => c.collected).length;
-        const allCollected = uncollectedCount === 0 && collectedCount > 0;
+        // 关键修复：只检查当前关卡内的收集品状态（不依赖累计的quantumShards）
+        // 确保所有collectibles的collected属性都是明确的布尔值
+        this.collectibles.forEach((c, idx) => {
+            if (c.collected === undefined || c.collected === null) {
+                console.warn(`Level ${this.currentLevel} collectible ${idx}: collected is ${c.collected}, fixing to false`);
+                c.collected = false;
+            }
+        });
         
-        // 详细的调试信息
-        if (uncollectedCount === 0 && collectedCount > 0 && !this.levelCompleteTriggered) {
+        // 严格检查：当前关卡内所有收集品都必须 collected === true
+        const currentLevelCollectibles = this.collectibles; // 当前关卡的收集品数组
+        const uncollectedInCurrentLevel = currentLevelCollectibles.filter(c => c.collected !== true);
+        const collectedInCurrentLevel = currentLevelCollectibles.filter(c => c.collected === true);
+        
+        const uncollectedCount = uncollectedInCurrentLevel.length;
+        const collectedCount = collectedInCurrentLevel.length;
+        const totalInCurrentLevel = currentLevelCollectibles.length;
+        
+        // 通关条件：当前关卡内所有收集品都已收集（collected === true）
+        const allCollectedInCurrentLevel = uncollectedCount === 0 && collectedCount === totalInCurrentLevel && totalInCurrentLevel > 0;
+        
+        // 每帧检查（只在接近完成时输出）
+        if (uncollectedCount <= 2) {
+            console.log(`[Level ${this.currentLevel}] Current level progress: ${collectedCount}/${totalInCurrentLevel} collected (量子碎片总数: ${this.quantumShards})`);
+        }
+        
+        // 检查是否当前关卡的所有收集品都已收集
+        if (allCollectedInCurrentLevel && !this.levelCompleteTriggered) {
             console.log(`=== LEVEL ${this.currentLevel} COMPLETED ===`);
-            console.log(`Total collectibles: ${this.collectibles.length}`);
-            console.log(`Collected: ${collectedCount}`);
-            console.log(`Uncollected: ${uncollectedCount}`);
-            console.log(`All collected: ${allCollected}`);
+            console.log(`Current level collectibles: ${totalInCurrentLevel}`);
+            console.log(`Collected in current level: ${collectedCount}`);
+            console.log(`Uncollected in current level: ${uncollectedCount}`);
+            console.log(`Total quantum shards (accumulated): ${this.quantumShards}`);
+            console.log(`All collected in current level: ${allCollectedInCurrentLevel}`);
             console.log(`Level complete triggered: ${this.levelCompleteTriggered}`);
+            
+            // 验证每个收集品的状态
+            currentLevelCollectibles.forEach((c, idx) => {
+                console.log(`  Collectible ${idx}: collected=${c.collected} (should be true)`);
+            });
             
             this.levelCompleteTriggered = true;
             this.showLevelComplete();
             
             // 使用箭头函数确保this绑定正确
             const self = this;
+            const currentLevel = this.currentLevel; // 保存关卡号
             setTimeout(() => {
-                console.log(`Timeout callback executing for level ${self.currentLevel}`);
-                self.nextLevel();
+                console.log(`Timeout callback executing for level ${currentLevel}`);
+                if (self.currentLevel === currentLevel) { // 确保关卡还没变化
+                    self.nextLevel();
+                }
             }, 2000);
+        } else if (allCollectedInCurrentLevel && this.levelCompleteTriggered) {
+            // 已经触发但还没切换，可能是setTimeout没执行
+            console.warn(`Level ${this.currentLevel} completed but not advanced. Triggered: ${this.levelCompleteTriggered}`);
         }
     }
     
