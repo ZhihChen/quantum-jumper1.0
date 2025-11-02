@@ -8,12 +8,11 @@ class QuantumJumper {
         this.quantumShards = 0;
         this.energy = 100;
         this.maxEnergy = 100;
-        this.levelCompleteTriggered = false; // 防止重复触发关卡完成
-        this.lastDimensionSwitchTime = 0; // 记录最后一次维度切换时间，用于掉落保护
-        this.upperBoundWarningTime = 0; // 记录超出上界的时间，0表示未超出
-        this.upperBoundGracePeriod = 5000; // 上界宽限期：5秒
-        this.levelRestartCount = {}; // 记录每个关卡的重启次数，用于随机变化
-        this.maxLevel = 10; // 最大关卡数
+        
+        // 反重力边界警告相关
+        this.outOfBoundsTimer = 0;
+        this.isOutOfBoundsWarning = false;
+        this.outOfBoundsWarningTime = 5000; // 5秒限制（毫秒）
         
         // 维度系统
         this.currentDimension = 0;
@@ -120,22 +119,7 @@ class QuantumJumper {
         document.getElementById('quitBtn').addEventListener('click', () => this.quitGame());
         document.getElementById('settingsBtn').addEventListener('click', () => this.showSettings());
         document.getElementById('closeSettings').addEventListener('click', () => this.hideSettings());
-        
-        // 胜利界面事件
-        const restartFromVictoryBtn = document.getElementById('restartFromVictoryBtn');
-        const quitFromVictoryBtn = document.getElementById('quitFromVictoryBtn');
-        if (restartFromVictoryBtn) {
-            restartFromVictoryBtn.addEventListener('click', () => {
-                document.getElementById('victoryOverlay').classList.add('hidden');
-                this.restartGame();
-            });
-        }
-        if (quitFromVictoryBtn) {
-            quitFromVictoryBtn.addEventListener('click', () => {
-                document.getElementById('victoryOverlay').classList.add('hidden');
-                this.quitGame();
-            });
-        }
+        document.getElementById('nextLevelBtn').addEventListener('click', () => this.nextLevel());
         
         // 维度按钮
         document.querySelectorAll('.dimension-button').forEach(btn => {
@@ -206,15 +190,8 @@ class QuantumJumper {
     startGame() {
         this.gameState = 'playing';
         document.getElementById('gameOverlay').classList.add('hidden');
-        this.levelCompleteTriggered = false; // 重置关卡完成标志
-        this.upperBoundWarningTime = 0; // 重置上界警告时间
-        // 如果能量耗尽，恢复能量；否则保持当前能量
-        if (this.energy <= 0) {
-            this.energy = this.maxEnergy;
-        }
         this.resetPlayer();
         this.loadLevel(this.currentLevel);
-        this.updateUI();
     }
     
     togglePause() {
@@ -232,7 +209,6 @@ class QuantumJumper {
         this.quantumShards = 0;
         this.energy = this.maxEnergy;
         this.currentDimension = 0;
-        this.levelCompleteTriggered = false; // 重置关卡完成标志
         this.gameState = 'playing';
         document.getElementById('pauseMenu').classList.add('hidden');
         this.resetPlayer();
@@ -256,35 +232,25 @@ class QuantumJumper {
     
     switchDimension(dimension) {
         if (dimension >= 0 && dimension < this.dimensions.length && this.gameState === 'playing') {
-            const previousDimension = this.dimensions[this.currentDimension];
-            const newDimension = this.dimensions[dimension];
             this.currentDimension = dimension;
-            this.lastDimensionSwitchTime = Date.now(); // 记录切换时间，用于掉落保护
-            
-            // 如果从反重力模式切换到其他模式，且玩家还在上界外，给机会恢复
-            if (previousDimension.gravity < 0 && newDimension.gravity >= 0 && this.upperBoundWarningTime > 0) {
-                // 切换到正常维度，宽限期继续，但如果玩家回到屏幕内则清除警告
-                // 这个检查会在checkCollisions中处理
-            }
-            
             this.updateDimensionButtons();
             this.createDimensionSwitchEffect();
             this.playSound('dimensionSwitch');
             this.updateUI();
+            
+            // 重置越界警告计时器
+            if (this.isOutOfBoundsWarning) {
+                // 检查是否切换到非反重力维度，如果玩家回到屏幕内则重置警告
+                if (dimension !== 1 && this.player.y > -this.player.height) {
+                    this.outOfBoundsTimer = 0;
+                    this.isOutOfBoundsWarning = false;
+                }
+            }
         }
     }
     
     cycleDimension(direction) {
-        const previousDimension = this.dimensions[this.currentDimension];
         this.currentDimension = (this.currentDimension + direction + this.dimensions.length) % this.dimensions.length;
-        const newDimension = this.dimensions[this.currentDimension];
-        this.lastDimensionSwitchTime = Date.now(); // 记录切换时间，用于掉落保护
-        
-        // 如果从反重力模式切换到其他模式，处理宽限期逻辑
-        if (previousDimension.gravity < 0 && newDimension.gravity >= 0 && this.upperBoundWarningTime > 0) {
-            // 切换到正常维度，宽限期继续
-        }
-        
         this.updateDimensionButtons();
         this.createDimensionSwitchEffect();
         this.playSound('dimensionSwitch');
@@ -294,16 +260,7 @@ class QuantumJumper {
     quickSwitch() {
         // 在当前维度和前一个维度间切换
         const prevDimension = this.currentDimension;
-        const previousDimension = this.dimensions[this.currentDimension];
         this.currentDimension = (this.currentDimension + 1) % this.dimensions.length;
-        const newDimension = this.dimensions[this.currentDimension];
-        this.lastDimensionSwitchTime = Date.now(); // 记录切换时间，用于掉落保护
-        
-        // 如果从反重力模式切换到其他模式，处理宽限期逻辑
-        if (previousDimension.gravity < 0 && newDimension.gravity >= 0 && this.upperBoundWarningTime > 0) {
-            // 切换到正常维度，宽限期继续
-        }
-        
         this.updateDimensionButtons();
         this.createDimensionSwitchEffect();
         this.updateUI();
@@ -341,501 +298,541 @@ class QuantumJumper {
         this.player.vx = 0;
         this.player.vy = 0;
         this.player.trail = [];
-        this.upperBoundWarningTime = 0; // 重置上界警告时间
+        this.currentDimension = 0; // 重置为正常维度
+        this.updateDimensionButtons(); // 更新维度按钮状态
     }
     
     loadLevel(level) {
-        console.log(`=== loadLevel(${level}) called ===`);
-        
-        // 关键：每关开始时，重置当前关卡的收集品数组（但不重置累计的quantumShards）
         this.platforms = [];
-        this.collectibles = []; // 重置当前关卡收集品数组
+        this.collectibles = [];
         this.hazards = [];
         this.portals = [];
-        this.levelCompleteTriggered = false; // 重置关卡完成标志
-        this.upperBoundWarningTime = 0; // 重置上界警告时间
-        
-        // 注意：quantumShards 是累计的，不会在这里重置
-        console.log(`Loading level ${level} (累计量子碎片: ${this.quantumShards})`);
-        
-        // 如果是4-10关，增加重启计数（用于随机变化）
-        // 注意：每次重新加载同一关时（比如能量耗尽重启），都会增加计数
-        // 这样每次重启都会有不同的随机布局
-        if (level >= 4 && level <= 10) {
-            if (!this.levelRestartCount[level]) {
-                this.levelRestartCount[level] = 0; // 首次加载，种子为0
-            }
-            // 注意：这里不立即增加，而是在每次调用时使用当前值
-            // 但为了确保每次重启都有变化，我们在gameOver时已经通过重新调用loadLevel来处理
-        }
         
         // 根据关卡生成不同的布局
         switch (level) {
             case 1:
-                this.loadLevel1();
-                break;
-            case 2:
-                this.loadLevel2();
-                break;
-            case 3:
-                this.loadLevel3();
-                break;
-            case 4:
-                this.loadLevel4();
-                break;
-            case 5:
-                this.loadLevel5();
-                break;
-            case 6:
-                this.loadLevel6();
-                break;
-            case 7:
-                this.loadLevel7();
-                break;
-            case 8:
-                this.loadLevel8();
-                break;
-            case 9:
-                this.loadLevel9();
-                break;
-            case 10:
-                this.loadLevel10();
-                break;
-            default:
-                // 超过10关显示胜利
-                if (level > this.maxLevel) {
-                    this.showVictory();
-                } else {
-                    console.warn(`Unknown level ${level}, loading level 1 as fallback`);
-                    this.loadLevel1(); // 默认加载第一关
-                }
-        }
-        
-        // 验证关卡加载结果 - 确保当前关卡的所有收集品都正确初始化
-        console.log(`Level ${level} loaded successfully:`);
-        console.log(`- Platforms: ${this.platforms.length}`);
-        console.log(`- Current level collectibles: ${this.collectibles.length}`);
-        console.log(`- Total quantum shards (accumulated): ${this.quantumShards}`);
-        
-        if (this.collectibles.length > 0) {
-            // 强制确保所有收集品的collected状态都是false
-            let fixed = 0;
-            this.collectibles.forEach((c, idx) => {
-                if (c.collected !== false) {
-                    c.collected = false;
-                    fixed++;
-                }
-            });
-            
-            if (fixed > 0) {
-                console.warn(`- Fixed: Reset ${fixed} collectibles to collected=false`);
-            }
-            
-            const allUncollected = this.collectibles.every(c => c.collected === false);
-            console.log(`- All collectibles in current level initialized with collected=false: ${allUncollected}`);
-            
-            // 验证：确保所有收集品都是当前关卡新创建的
-            console.log(`✓ Current level ${level} collectibles ready (will be checked independently for completion)`);
-        } else {
-            console.error(`- ERROR: No collectibles in level ${level}!`);
-        }
-    }
-    
-    // 关卡1：基础教学 - 正常维度
-    loadLevel1() {
-        this.platforms.push(
-            { x: 0, y: 550, width: 800, height: 50, dimension: 0 },
-            { x: 200, y: 450, width: 100, height: 20, dimension: 0 },
-            { x: 400, y: 350, width: 100, height: 20, dimension: 0 },
-            { x: 600, y: 250, width: 100, height: 20, dimension: 0 }
-        );
-        
-        this.collectibles.push(
-            { x: 250, y: 400, width: 15, height: 15, collected: false },
-            { x: 450, y: 300, width: 15, height: 15, collected: false },
-            { x: 650, y: 200, width: 15, height: 15, collected: false }
-        );
-    }
-    
-    // 关卡2：引入反重力维度
-    loadLevel2() {
-        this.platforms.push(
-            { x: 0, y: 550, width: 300, height: 50, dimension: 0 },
-            { x: 500, y: 550, width: 300, height: 50, dimension: 0 },
-            { x: 350, y: 300, width: 100, height: 20, dimension: 1 }, // 反重力平台
-            { x: 200, y: 150, width: 100, height: 20, dimension: 0 },
-            { x: 500, y: 150, width: 100, height: 20, dimension: 0 }
-        );
-        
-        this.collectibles.push(
-            { x: 400, y: 250, width: 15, height: 15, collected: false },
-            { x: 250, y: 100, width: 15, height: 15, collected: false },
-            { x: 550, y: 100, width: 15, height: 15, collected: false }
-        );
-    }
-    
-    // 关卡3：引入时间扭曲和能量场维度，包含危险区域
-    loadLevel3() {
-        this.platforms.push(
-            { x: 0, y: 550, width: 200, height: 50, dimension: 0 },
-            { x: 300, y: 450, width: 100, height: 20, dimension: 2 }, // 时间扭曲平台
-            { x: 500, y: 350, width: 100, height: 20, dimension: 3 }, // 能量场平台
-            { x: 700, y: 250, width: 100, height: 20, dimension: 0 },
-            { x: 150, y: 150, width: 80, height: 20, dimension: 0 }
-        );
-        
-        this.hazards.push(
-            { x: 250, y: 500, width: 300, height: 20, dimension: 0, type: 'laser' }
-        );
-        
-        this.collectibles.push(
-            { x: 350, y: 400, width: 15, height: 15, collected: false },
-            { x: 550, y: 300, width: 15, height: 15, collected: false },
-            { x: 750, y: 200, width: 15, height: 15, collected: false },
-            { x: 190, y: 100, width: 15, height: 15, collected: false }
-        );
-    }
-    
-    // 关卡4-10：使用随机变化
-    loadLevel4() {
-        const baseSeed = ((this.levelRestartCount[4] || 0) * 1000) + (Date.now() % 1000);
-        const rng = this.seededRandom(baseSeed);
-        this.generateComplexLevel(4, rng);
-    }
-    
-    loadLevel5() {
-        const baseSeed = ((this.levelRestartCount[5] || 0) * 1000) + (Date.now() % 1000);
-        const rng = this.seededRandom(baseSeed);
-        this.generateComplexLevel(5, rng);
-    }
-    
-    loadLevel6() {
-        const baseSeed = ((this.levelRestartCount[6] || 0) * 1000) + (Date.now() % 1000);
-        const rng = this.seededRandom(baseSeed);
-        this.generateComplexLevel(6, rng);
-    }
-    
-    loadLevel7() {
-        const baseSeed = ((this.levelRestartCount[7] || 0) * 1000) + (Date.now() % 1000);
-        const rng = this.seededRandom(baseSeed);
-        this.generateComplexLevel(7, rng);
-    }
-    
-    loadLevel8() {
-        const baseSeed = ((this.levelRestartCount[8] || 0) * 1000) + (Date.now() % 1000);
-        const rng = this.seededRandom(baseSeed);
-        this.generateComplexLevel(8, rng);
-    }
-    
-    loadLevel9() {
-        const baseSeed = ((this.levelRestartCount[9] || 0) * 1000) + (Date.now() % 1000);
-        const rng = this.seededRandom(baseSeed);
-        this.generateComplexLevel(9, rng);
-    }
-    
-    loadLevel10() {
-        const baseSeed = ((this.levelRestartCount[10] || 0) * 1000) + (Date.now() % 1000);
-        const rng = this.seededRandom(baseSeed);
-        this.generateComplexLevel(10, rng);
-    }
-    
-    // 带随机种子的随机数生成器
-    seededRandom(seed) {
-        let value = seed;
-        return () => {
-            value = (value * 9301 + 49297) % 233280;
-            return value / 233280;
-        };
-    }
-    
-    // 生成复杂关卡（4-10关）- 难度递增的解谜挑战
-    generateComplexLevel(level, rng) {
-        // 基础平台（起点）
-        this.platforms.push({ x: 0, y: 550, width: 200, height: 50, dimension: 0 });
-        
-        const numCollectibles = 3 + Math.floor(level / 2);
-        console.log(`Generating level ${level}: target collectibles = ${numCollectibles}`);
-        
-        const platforms = [];
-        const collectibles = [];
-        const hazards = [];
-        
-        // 根据关卡难度调整参数
-        const basePathStages = 4 + Math.floor(level / 2); // 4-10关：5-9个阶段
-        const pathStages = Math.max(basePathStages, numCollectibles + 1); // 确保阶段数至少比收集品数多1
-        const hazardDensity = Math.min(0.7, 0.3 + (level - 4) * 0.1); // 4关30%，10关70%
-        const requireDimensionSwitch = level >= 6; // 6关以上要求必须切换维度
-        
-        console.log(`Level ${level}: pathStages=${pathStages}, numCollectibles=${numCollectibles}`);
-        
-        // 生成主要路径平台（确保可达性）
-        let lastX = 200;
-        let lastY = 450;
-        let usedDimensions = new Set([0]); // 记录已使用的维度
-        
-        for (let i = 0; i < pathStages; i++) {
-            // 确保使用所有四个维度
-            let dim;
-            if (requireDimensionSwitch && i > 0 && i % 2 === 0) {
-                // 强制使用未使用的维度
-                const unusedDims = [0, 1, 2, 3].filter(d => !usedDimensions.has(d));
-                dim = unusedDims.length > 0 ? unusedDims[Math.floor(rng() * unusedDims.length)] : Math.floor(rng() * 4);
-                usedDimensions.add(dim);
-            } else {
-                dim = Math.floor(rng() * 4);
-                usedDimensions.add(dim);
-            }
-            
-            // 根据维度调整位置策略
-            let x, y;
-            if (dim === 1) {
-                // 反重力：平台在中间偏上
-                x = lastX + 130 + rng() * 80;
-                y = Math.max(150, Math.min(350, lastY - 60 + (rng() - 0.3) * 120));
-            } else if (dim === 2) {
-                // 时间扭曲：位置适中，但可能需要精确操作
-                x = lastX + 120 + rng() * 90;
-                y = Math.max(200, Math.min(400, lastY - 50 + (rng() - 0.5) * 100));
-            } else if (dim === 3) {
-                // 能量场：位置随机，增加挑战
-                x = lastX + 140 + rng() * 70;
-                y = Math.max(150, Math.min(450, lastY - 70 + (rng() - 0.4) * 140));
-            } else {
-                // 正常维度：标准跳跃
-                x = lastX + 120 + rng() * 100;
-                y = Math.max(200, Math.min(450, lastY - 80 + (rng() - 0.5) * 160));
-            }
-            
-            const width = 70 + rng() * 50;
-            platforms.push({
-                x: x,
-                y: y,
-                width: width,
-                height: 20,
-                dimension: dim
-            });
-            
-            // 收集品放在平台上（确保每个收集品都有明确的路径）
-            // 确保在前numCollectibles个阶段都放置收集品
-            if (collectibles.length < numCollectibles) {
-                collectibles.push({
-                    x: x + width / 2 - 7,
-                    y: y - 25,
-                    width: 15,
-                    height: 15,
-                    collected: false
-                });
-            }
-            
-            // 添加危险区域（难度递增，位置更刁钻）
-            if (level >= 4 && rng() < hazardDensity) {
-                const hazardDim = Math.floor(rng() * 4);
-                // 危险区域可能在路径中间或旁边
-                const hazardX = lastX + (x - lastX) / 2 + (rng() - 0.5) * 100;
-                const hazardY = y + 30 + rng() * 80;
-                hazards.push({
-                    x: hazardX,
-                    y: hazardY,
-                    width: 50 + rng() * 50,
-                    height: 20,
-                    dimension: hazardDim,
-                    type: 'laser'
-                });
-            }
-            
-            // 添加辅助平台（增加解谜选项）
-            if (level >= 7 && rng() > 0.6) {
-                const auxDim = Math.floor(rng() * 4);
-                platforms.push({
-                    x: x - 80 - rng() * 60,
-                    y: y + (rng() > 0.5 ? 60 : -60),
-                    width: 50 + rng() * 40,
-                    height: 20,
-                    dimension: auxDim
-                });
-            }
-            
-            lastX = x + width;
-            lastY = y;
-        }
-        
-        // 添加最终挑战区域（4关以上都有，6关以上更复杂）
-        if (level >= 4) {
-            const finalDim = Math.floor(rng() * 4);
-            const finalPlat = {
-                x: Math.min(750, lastX + 50),
-                y: 150 + rng() * 200,
-                width: 80 + rng() * 40,
-                height: 20,
-                dimension: finalDim
-            };
-            platforms.push(finalPlat);
-            
-            // 如果收集品还不够，在最终平台添加
-            if (collectibles.length < numCollectibles) {
-                collectibles.push({
-                    x: finalPlat.x + finalPlat.width / 2 - 7,
-                    y: finalPlat.y - 25,
-                    width: 15,
-                    height: 15,
-                    collected: false
-                });
-            }
-            
-            // 最终区域危险（难度递增：6关以上出现）
-            if (level >= 6 && rng() > 0.4) {
-                hazards.push({
-                    x: Math.min(700, lastX),
-                    y: 300 + rng() * 150,
-                    width: 60 + rng() * 60,
-                    height: 20,
-                    dimension: Math.floor(rng() * 4),
-                    type: 'laser'
-                });
-            }
-        }
-        
-        // 确保收集品数量足够 - 优先从主要路径平台添加
-        let attempts = 0;
-        const maxAttempts = platforms.length * 2; // 限制尝试次数，避免无限循环
-        
-        while (collectibles.length < numCollectibles && platforms.length > 0 && attempts < maxAttempts) {
-            attempts++;
-            const plat = platforms[Math.floor(rng() * platforms.length)];
-            // 检查是否已经有收集品在这个平台附近
-            const hasNearbyCollectible = collectibles.some(c => 
-                Math.abs(c.x - (plat.x + plat.width / 2)) < 50 && 
-                Math.abs(c.y - (plat.y - 25)) < 50
-            );
-            
-            if (!hasNearbyCollectible) {
-                collectibles.push({
-                    x: plat.x + plat.width / 2 - 7,
-                    y: plat.y - 25,
-                    width: 15,
-                    height: 15,
-                    collected: false
-                });
-            } else {
-                // 如果附近已有收集品，尝试其他平台
-                const availablePlats = platforms.filter((p) => {
-                    const checkX = p.x + p.width / 2;
-                    const checkY = p.y - 25;
-                    return !collectibles.some(c => 
-                        Math.abs(c.x - checkX) < 50 && Math.abs(c.y - checkY) < 50
-                    );
-                });
-                if (availablePlats.length > 0) {
-                    const plat2 = availablePlats[Math.floor(rng() * availablePlats.length)];
-                    collectibles.push({
-                        x: plat2.x + plat2.width / 2 - 7,
-                        y: plat2.y - 25,
-                        width: 15,
-                        height: 15,
-                        collected: false
-                    });
-                } else {
-                    // 如果所有平台都有收集品了，强制添加（可能重叠，但至少保证数量）
-                    collectibles.push({
-                        x: plat.x + plat.width / 2 - 7,
-                        y: plat.y - 25,
-                        width: 15,
-                        height: 15,
-                        collected: false
-                    });
-                }
-            }
-        }
-        
-        // 强制确保收集品数量正确 - 这是最后保障
-        if (collectibles.length < numCollectibles) {
-            console.warn(`Level ${level}: Expected ${numCollectibles} collectibles, got ${collectibles.length}. Force adding remaining...`);
-            const remaining = numCollectibles - collectibles.length;
-            
-            // 从所有平台中选择，优先选择还没有收集品的平台
-            const platformsWithoutCollectibles = platforms.filter(p => {
-                const checkX = p.x + p.width / 2;
-                const checkY = p.y - 25;
-                return !collectibles.some(c => 
-                    Math.abs(c.x - checkX) < 30 && Math.abs(c.y - checkY) < 30
+                // 简单关卡，基础平台
+                this.platforms.push(
+                    { x: 0, y: 550, width: 800, height: 50, dimension: 0 },
+                    { x: 200, y: 450, width: 100, height: 20, dimension: 0 },
+                    { x: 400, y: 350, width: 100, height: 20, dimension: 0 },
+                    { x: 600, y: 250, width: 100, height: 20, dimension: 0 }
                 );
-            });
-            
-            // 添加剩余的收集品
-            for (let i = 0; i < remaining; i++) {
-                let targetPlatform;
-                if (platformsWithoutCollectibles.length > 0) {
-                    // 优先选择没有收集品的平台
-                    targetPlatform = platformsWithoutCollectibles[i % platformsWithoutCollectibles.length];
-                } else if (platforms.length > 0) {
-                    // 如果没有可用平台，强制添加到已有平台（可能重叠）
-                    targetPlatform = platforms[i % platforms.length];
-                } else {
-                    // 如果连平台都没有，添加到基础平台
-                    break;
+                
+                this.collectibles.push(
+                    { x: 250, y: 400, width: 15, height: 15, collected: false },
+                    { x: 450, y: 300, width: 15, height: 15, collected: false },
+                    { x: 650, y: 200, width: 15, height: 15, collected: false }
+                );
+                break;
+                
+            case 2:
+                // 引入反重力维度
+                this.platforms.push(
+                    { x: 0, y: 550, width: 300, height: 50, dimension: 0 },
+                    { x: 500, y: 550, width: 300, height: 50, dimension: 0 },
+                    { x: 350, y: 300, width: 100, height: 20, dimension: 1 }, // 反重力平台
+                    { x: 200, y: 150, width: 100, height: 20, dimension: 0 },
+                    { x: 500, y: 150, width: 100, height: 20, dimension: 0 }
+                );
+                
+                this.collectibles.push(
+                    { x: 400, y: 250, width: 15, height: 15, collected: false },
+                    { x: 250, y: 100, width: 15, height: 15, collected: false },
+                    { x: 550, y: 100, width: 15, height: 15, collected: false }
+                );
+                break;
+                
+            case 3:
+                // 时间扭曲维度
+                this.platforms.push(
+                    { x: 0, y: 550, width: 200, height: 50, dimension: 0 },
+                    { x: 300, y: 450, width: 100, height: 20, dimension: 2 }, // 时间扭曲平台
+                    { x: 500, y: 350, width: 100, height: 20, dimension: 0 },
+                    { x: 700, y: 250, width: 100, height: 20, dimension: 0 }
+                );
+                
+                this.hazards.push(
+                    { x: 250, y: 500, width: 300, height: 20, dimension: 0, type: 'laser' }
+                );
+                
+                this.collectibles.push(
+                    { x: 350, y: 400, width: 15, height: 15, collected: false },
+                    { x: 550, y: 300, width: 15, height: 15, collected: false },
+                    { x: 750, y: 200, width: 15, height: 15, collected: false }
+                );
+                break;
+                
+            case 4:
+                // 第4关：能量场维度引入，缩短平台宽度
+                this.platforms.push(
+                    { x: 0, y: 550, width: 150, height: 50, dimension: 0 },
+                    { x: 300, y: 450, width: 80, height: 20, dimension: 0 }, // 缩短的平台
+                    { x: 150, y: 350, width: 70, height: 20, dimension: 3 }, // 能量场平台
+                    { x: 400, y: 300, width: 70, height: 20, dimension: 1 }, // 反重力平台
+                    { x: 600, y: 250, width: 80, height: 20, dimension: 0 }
+                );
+                
+                // 动态红色方块（危险区域）
+                this.hazards.push(
+                    { x: 500, y: 400, width: 200, height: 20, dimension: 0, type: 'laser' },
+                    { x: 200, y: 200, width: 150, height: 20, dimension: 0, type: 'laser' }
+                );
+                
+                this.collectibles.push(
+                    { x: 330, y: 400, width: 15, height: 15, collected: false },
+                    { x: 185, y: 300, width: 15, height: 15, collected: false },
+                    { x: 430, y: 250, width: 15, height: 15, collected: false },
+                    { x: 640, y: 200, width: 15, height: 15, collected: false }
+                );
+                break;
+                
+            case 5:
+                // 第5关：多维度组合，更窄的平台，更多危险区域
+                this.platforms.push(
+                    { x: 0, y: 550, width: 120, height: 50, dimension: 0 },
+                    { x: 250, y: 480, width: 60, height: 20, dimension: 2 }, // 时间扭曲平台
+                    { x: 100, y: 400, width: 50, height: 20, dimension: 1 }, // 反重力平台
+                    { x: 400, y: 350, width: 60, height: 20, dimension: 3 }, // 能量场平台
+                    { x: 300, y: 250, width: 50, height: 20, dimension: 0 },
+                    { x: 550, y: 200, width: 60, height: 20, dimension: 0 }
+                );
+                
+                // 更多动态红色方块
+                this.hazards.push(
+                    { x: 150, y: 500, width: 100, height: 20, dimension: 0, type: 'laser' },
+                    { x: 350, y: 450, width: 100, height: 20, dimension: 0, type: 'laser' },
+                    { x: 200, y: 300, width: 150, height: 20, dimension: 0, type: 'laser' },
+                    { x: 450, y: 150, width: 200, height: 20, dimension: 0, type: 'laser' }
+                );
+                
+                this.collectibles.push(
+                    { x: 280, y: 430, width: 15, height: 15, collected: false },
+                    { x: 125, y: 350, width: 15, height: 15, collected: false },
+                    { x: 430, y: 300, width: 15, height: 15, collected: false },
+                    { x: 325, y: 200, width: 15, height: 15, collected: false },
+                    { x: 580, y: 150, width: 15, height: 15, collected: false }
+                );
+                break;
+                
+            case 6:
+                // 第6关：需要精确维度切换的平台
+                this.platforms.push(
+                    { x: 0, y: 550, width: 100, height: 50, dimension: 0 },
+                    { x: 300, y: 500, width: 70, height: 20, dimension: 0 },
+                    { x: 150, y: 420, width: 60, height: 20, dimension: 1 }, // 反重力平台
+                    { x: 450, y: 380, width: 60, height: 20, dimension: 2 }, // 时间扭曲平台
+                    { x: 250, y: 300, width: 50, height: 20, dimension: 3 }, // 能量场平台
+                    { x: 550, y: 300, width: 50, height: 20, dimension: 0 },
+                    { x: 400, y: 200, width: 60, height: 20, dimension: 1 }, // 反重力平台
+                    { x: 650, y: 150, width: 70, height: 20, dimension: 0 }
+                );
+                
+                // 交错的危险区域
+                this.hazards.push(
+                    { x: 120, y: 520, width: 180, height: 20, dimension: 0, type: 'laser' },
+                    { x: 380, y: 500, width: 120, height: 20, dimension: 0, type: 'laser' },
+                    { x: 200, y: 450, width: 100, height: 20, dimension: 0, type: 'laser' },
+                    { x: 500, y: 420, width: 150, height: 20, dimension: 0, type: 'laser' },
+                    { x: 150, y: 350, width: 100, height: 20, dimension: 0, type: 'laser' },
+                    { x: 300, y: 250, width: 200, height: 20, dimension: 0, type: 'laser' }
+                );
+                
+                this.collectibles.push(
+                    { x: 335, y: 450, width: 15, height: 15, collected: false },
+                    { x: 180, y: 370, width: 15, height: 15, collected: false },
+                    { x: 480, y: 330, width: 15, height: 15, collected: false },
+                    { x: 275, y: 250, width: 15, height: 15, collected: false },
+                    { x: 575, y: 250, width: 15, height: 15, collected: false },
+                    { x: 430, y: 150, width: 15, height: 15, collected: false },
+                    { x: 685, y: 100, width: 15, height: 15, collected: false }
+                );
+                break;
+                
+            case 7:
+                // 第7关：复杂的多维度平台网络
+                this.platforms.push(
+                    { x: 0, y: 550, width: 80, height: 50, dimension: 0 }, // 非常窄的起始平台
+                    { x: 200, y: 520, width: 60, height: 20, dimension: 3 }, // 能量场平台
+                    { x: 100, y: 450, width: 50, height: 20, dimension: 1 }, // 反重力平台
+                    { x: 350, y: 450, width: 50, height: 20, dimension: 2 }, // 时间扭曲平台
+                    { x: 200, y: 380, width: 40, height: 20, dimension: 0 }, // 极窄的平台
+                    { x: 500, y: 400, width: 60, height: 20, dimension: 3 }, // 能量场平台
+                    { x: 300, y: 320, width: 50, height: 20, dimension: 1 }, // 反重力平台
+                    { x: 600, y: 350, width: 40, height: 20, dimension: 0 }, // 极窄的平台
+                    { x: 450, y: 280, width: 60, height: 20, dimension: 2 }, // 时间扭曲平台
+                    { x: 250, y: 220, width: 50, height: 20, dimension: 0 },
+                    { x: 550, y: 220, width: 40, height: 20, dimension: 3 }, // 能量场平台
+                    { x: 400, y: 150, width: 60, height: 20, dimension: 1 }, // 反重力平台
+                    { x: 700, y: 200, width: 50, height: 20, dimension: 0 }
+                );
+                
+                // 大量动态红色方块
+                this.hazards.push(
+                    { x: 100, y: 530, width: 100, height: 20, dimension: 0, type: 'laser' },
+                    { x: 270, y: 520, width: 150, height: 20, dimension: 0, type: 'laser' },
+                    { x: 150, y: 480, width: 200, height: 20, dimension: 0, type: 'laser' },
+                    { x: 420, y: 480, width: 120, height: 20, dimension: 0, type: 'laser' },
+                    { x: 580, y: 450, width: 100, height: 20, dimension: 0, type: 'laser' },
+                    { x: 250, y: 420, width: 200, height: 20, dimension: 0, type: 'laser' },
+                    { x: 100, y: 350, width: 100, height: 20, dimension: 0, type: 'laser' },
+                    { x: 400, y: 350, width: 100, height: 20, dimension: 0, type: 'laser' },
+                    { x: 650, y: 300, width: 100, height: 20, dimension: 0, type: 'laser' },
+                    { x: 150, y: 280, width: 150, height: 20, dimension: 0, type: 'laser' },
+                    { x: 350, y: 250, width: 200, height: 20, dimension: 0, type: 'laser' },
+                    { x: 500, y: 180, width: 150, height: 20, dimension: 0, type: 'laser' }
+                );
+                
+                this.collectibles.push(
+                    { x: 230, y: 470, width: 15, height: 15, collected: false },
+                    { x: 125, y: 400, width: 15, height: 15, collected: false },
+                    { x: 375, y: 400, width: 15, height: 15, collected: false },
+                    { x: 220, y: 330, width: 15, height: 15, collected: false },
+                    { x: 530, y: 350, width: 15, height: 15, collected: false },
+                    { x: 325, y: 270, width: 15, height: 15, collected: false },
+                    { x: 620, y: 300, width: 15, height: 15, collected: false },
+                    { x: 480, y: 230, width: 15, height: 15, collected: false },
+                    { x: 275, y: 170, width: 15, height: 15, collected: false },
+                    { x: 570, y: 170, width: 15, height: 15, collected: false },
+                    { x: 430, y: 100, width: 15, height: 15, collected: false },
+                    { x: 725, y: 150, width: 15, height: 15, collected: false }
+                );
+                break;
+                
+            case 8:
+                // 第8关：垂直挑战，利用反重力和其他维度
+                this.platforms.push(
+                    { x: 0, y: 550, width: 100, height: 50, dimension: 0 },
+                    { x: 200, y: 520, width: 50, height: 20, dimension: 0 },
+                    { x: 400, y: 500, width: 50, height: 20, dimension: 3 }, // 能量场平台
+                    { x: 300, y: 450, width: 60, height: 20, dimension: 1 }, // 反重力平台
+                    { x: 100, y: 420, width: 40, height: 20, dimension: 2 }, // 时间扭曲平台
+                    { x: 500, y: 400, width: 50, height: 20, dimension: 0 },
+                    { x: 200, y: 350, width: 40, height: 20, dimension: 1 }, // 反重力平台
+                    { x: 400, y: 320, width: 60, height: 20, dimension: 3 }, // 能量场平台
+                    { x: 300, y: 270, width: 40, height: 20, dimension: 2 }, // 时间扭曲平台
+                    { x: 600, y: 250, width: 50, height: 20, dimension: 0 },
+                    { x: 100, y: 220, width: 40, height: 20, dimension: 1 }, // 反重力平台
+                    { x: 400, y: 200, width: 40, height: 20, dimension: 0 },
+                    { x: 500, y: 150, width: 60, height: 20, dimension: 3 }, // 能量场平台
+                    { x: 300, y: 100, width: 50, height: 20, dimension: 2 }, // 时间扭曲平台
+                    { x: 700, y: 100, width: 50, height: 20, dimension: 0 }
+                );
+                
+                // 密集的危险区域
+                this.hazards.push(
+                    { x: 120, y: 530, width: 150, height: 20, dimension: 0, type: 'laser' },
+                    { x: 470, y: 520, width: 150, height: 20, dimension: 0, type: 'laser' },
+                    { x: 150, y: 480, width: 200, height: 20, dimension: 0, type: 'laser' },
+                    { x: 350, y: 480, width: 250, height: 20, dimension: 0, type: 'laser' },
+                    { x: 0, y: 450, width: 150, height: 20, dimension: 0, type: 'laser' },
+                    { x: 350, y: 420, width: 200, height: 20, dimension: 0, type: 'laser' },
+                    { x: 250, y: 380, width: 250, height: 20, dimension: 0, type: 'laser' },
+                    { x: 550, y: 350, width: 150, height: 20, dimension: 0, type: 'laser' },
+                    { x: 100, y: 320, width: 250, height: 20, dimension: 0, type: 'laser' },
+                    { x: 450, y: 300, width: 200, height: 20, dimension: 0, type: 'laser' },
+                    { x: 200, y: 250, width: 150, height: 20, dimension: 0, type: 'laser' },
+                    { x: 350, y: 220, width: 200, height: 20, dimension: 0, type: 'laser' },
+                    { x: 550, y: 200, width: 150, height: 20, dimension: 0, type: 'laser' },
+                    { x: 150, y: 180, width: 300, height: 20, dimension: 0, type: 'laser' },
+                    { x: 500, y: 120, width: 200, height: 20, dimension: 0, type: 'laser' },
+                    { x: 350, y: 70, width: 150, height: 20, dimension: 0, type: 'laser' }
+                );
+                
+                this.collectibles.push(
+                    { x: 225, y: 470, width: 15, height: 15, collected: false },
+                    { x: 425, y: 450, width: 15, height: 15, collected: false },
+                    { x: 325, y: 400, width: 15, height: 15, collected: false },
+                    { x: 120, y: 370, width: 15, height: 15, collected: false },
+                    { x: 525, y: 350, width: 15, height: 15, collected: false },
+                    { x: 220, y: 300, width: 15, height: 15, collected: false },
+                    { x: 425, y: 270, width: 15, height: 15, collected: false },
+                    { x: 320, y: 220, width: 15, height: 15, collected: false },
+                    { x: 625, y: 200, width: 15, height: 15, collected: false },
+                    { x: 120, y: 170, width: 15, height: 15, collected: false },
+                    { x: 420, y: 150, width: 15, height: 15, collected: false },
+                    { x: 530, y: 100, width: 15, height: 15, collected: false },
+                    { x: 325, y: 50, width: 15, height: 15, collected: false },
+                    { x: 725, y: 50, width: 15, height: 15, collected: false }
+                );
+                break;
+                
+            case 9:
+                // 第9关：复杂的平台组合，需要精确跳跃和维度切换
+                this.platforms.push(
+                    { x: 0, y: 550, width: 80, height: 50, dimension: 0 }, // 极窄起始平台
+                    { x: 250, y: 530, width: 40, height: 20, dimension: 3 }, // 能量场平台
+                    { x: 500, y: 530, width: 40, height: 20, dimension: 0 },
+                    { x: 120, y: 480, width: 60, height: 20, dimension: 1 }, // 反重力平台
+                    { x: 350, y: 480, width: 60, height: 20, dimension: 2 }, // 时间扭曲平台
+                    { x: 600, y: 480, width: 50, height: 20, dimension: 0 },
+                    { x: 200, y: 430, width: 50, height: 20, dimension: 3 }, // 能量场平台
+                    { x: 450, y: 430, width: 40, height: 20, dimension: 1 }, // 反重力平台
+                    { x: 100, y: 380, width: 50, height: 20, dimension: 0 },
+                    { x: 300, y: 380, width: 40, height: 20, dimension: 2 }, // 时间扭曲平台
+                    { x: 550, y: 380, width: 50, height: 20, dimension: 3 }, // 能量场平台
+                    { x: 180, y: 330, width: 40, height: 20, dimension: 1 }, // 反重力平台
+                    { x: 400, y: 330, width: 60, height: 20, dimension: 0 },
+                    { x: 650, y: 330, width: 50, height: 20, dimension: 2 }, // 时间扭曲平台
+                    { x: 250, y: 280, width: 50, height: 20, dimension: 3 }, // 能量场平台
+                    { x: 500, y: 280, width: 40, height: 20, dimension: 1 }, // 反重力平台
+                    { x: 120, y: 230, width: 50, height: 20, dimension: 0 },
+                    { x: 350, y: 230, width: 40, height: 20, dimension: 2 }, // 时间扭曲平台
+                    { x: 600, y: 230, width: 50, height: 20, dimension: 3 }, // 能量场平台
+                    { x: 200, y: 180, width: 60, height: 20, dimension: 1 }, // 反重力平台
+                    { x: 450, y: 180, width: 50, height: 20, dimension: 0 },
+                    { x: 100, y: 130, width: 40, height: 20, dimension: 3 }, // 能量场平台
+                    { x: 300, y: 130, width: 50, height: 20, dimension: 2 }, // 时间扭曲平台
+                    { x: 550, y: 130, width: 60, height: 20, dimension: 1 }, // 反重力平台
+                    { x: 200, y: 80, width: 50, height: 20, dimension: 0 },
+                    { x: 450, y: 80, width: 40, height: 20, dimension: 3 }, // 能量场平台
+                    { x: 700, y: 80, width: 50, height: 20, dimension: 2 }  // 时间扭曲平台
+                );
+                
+                // 极其密集的危险区域网络
+                this.hazards.push(
+                    // 底部危险区域
+                    { x: 100, y: 540, width: 200, height: 20, dimension: 0, type: 'laser' },
+                    { x: 350, y: 540, width: 200, height: 20, dimension: 0, type: 'laser' },
+                    { x: 550, y: 540, width: 200, height: 20, dimension: 0, type: 'laser' },
+                    // 第二层危险区域
+                    { x: 0, y: 500, width: 150, height: 20, dimension: 0, type: 'laser' },
+                    { x: 180, y: 500, width: 220, height: 20, dimension: 0, type: 'laser' },
+                    { x: 420, y: 500, width: 230, height: 20, dimension: 0, type: 'laser' },
+                    { x: 670, y: 500, width: 100, height: 20, dimension: 0, type: 'laser' },
+                    // 第三层危险区域
+                    { x: 100, y: 450, width: 200, height: 20, dimension: 0, type: 'laser' },
+                    { x: 320, y: 450, width: 180, height: 20, dimension: 0, type: 'laser' },
+                    { x: 520, y: 450, width: 250, height: 20, dimension: 0, type: 'laser' },
+                    // 第四层危险区域
+                    { x: 0, y: 400, width: 150, height: 20, dimension: 0, type: 'laser' },
+                    { x: 200, y: 400, width: 200, height: 20, dimension: 0, type: 'laser' },
+                    { x: 420, y: 400, width: 180, height: 20, dimension: 0, type: 'laser' },
+                    { x: 620, y: 400, width: 150, height: 20, dimension: 0, type: 'laser' },
+                    // 第五层危险区域
+                    { x: 100, y: 350, width: 150, height: 20, dimension: 0, type: 'laser' },
+                    { x: 270, y: 350, width: 230, height: 20, dimension: 0, type: 'laser' },
+                    { x: 520, y: 350, width: 250, height: 20, dimension: 0, type: 'laser' },
+                    // 第六层危险区域
+                    { x: 0, y: 300, width: 200, height: 20, dimension: 0, type: 'laser' },
+                    { x: 230, y: 300, width: 270, height: 20, dimension: 0, type: 'laser' },
+                    { x: 520, y: 300, width: 250, height: 20, dimension: 0, type: 'laser' },
+                    // 第七层危险区域
+                    { x: 100, y: 250, width: 200, height: 20, dimension: 0, type: 'laser' },
+                    { x: 320, y: 250, width: 180, height: 20, dimension: 0, type: 'laser' },
+                    { x: 520, y: 250, width: 250, height: 20, dimension: 0, type: 'laser' },
+                    // 第八层危险区域
+                    { x: 0, y: 200, width: 150, height: 20, dimension: 0, type: 'laser' },
+                    { x: 180, y: 200, width: 220, height: 20, dimension: 0, type: 'laser' },
+                    { x: 420, y: 200, width: 230, height: 20, dimension: 0, type: 'laser' },
+                    // 第九层危险区域
+                    { x: 100, y: 150, width: 200, height: 20, dimension: 0, type: 'laser' },
+                    { x: 320, y: 150, width: 180, height: 20, dimension: 0, type: 'laser' },
+                    { x: 520, y: 150, width: 250, height: 20, dimension: 0, type: 'laser' },
+                    // 顶层危险区域
+                    { x: 0, y: 100, width: 150, height: 20, dimension: 0, type: 'laser' },
+                    { x: 180, y: 100, width: 270, height: 20, dimension: 0, type: 'laser' },
+                    { x: 470, y: 100, width: 250, height: 20, dimension: 0, type: 'laser' }
+                );
+                
+                this.collectibles.push(
+                    { x: 270, y: 480, width: 15, height: 15, collected: false },
+                    { x: 520, y: 480, width: 15, height: 15, collected: false },
+                    { x: 150, y: 430, width: 15, height: 15, collected: false },
+                    { x: 375, y: 430, width: 15, height: 15, collected: false },
+                    { x: 625, y: 430, width: 15, height: 15, collected: false },
+                    { x: 225, y: 380, width: 15, height: 15, collected: false },
+                    { x: 470, y: 380, width: 15, height: 15, collected: false },
+                    { x: 125, y: 330, width: 15, height: 15, collected: false },
+                    { x: 320, y: 330, width: 15, height: 15, collected: false },
+                    { x: 575, y: 330, width: 15, height: 15, collected: false },
+                    { x: 190, y: 280, width: 15, height: 15, collected: false },
+                    { x: 425, y: 280, width: 15, height: 15, collected: false },
+                    { x: 675, y: 280, width: 15, height: 15, collected: false },
+                    { x: 275, y: 230, width: 15, height: 15, collected: false },
+                    { x: 520, y: 230, width: 15, height: 15, collected: false },
+                    { x: 125, y: 180, width: 15, height: 15, collected: false },
+                    { x: 375, y: 180, width: 15, height: 15, collected: false },
+                    { x: 625, y: 180, width: 15, height: 15, collected: false },
+                    { x: 120, y: 130, width: 15, height: 15, collected: false },
+                    { x: 325, y: 130, width: 15, height: 15, collected: false },
+                    { x: 575, y: 130, width: 15, height: 15, collected: false },
+                    { x: 225, y: 80, width: 15, height: 15, collected: false },
+                    { x: 470, y: 80, width: 15, height: 15, collected: false },
+                    { x: 725, y: 80, width: 15, height: 15, collected: false }
+                );
+                break;
+                
+            case 10:
+                // 第10关：最终挑战，完美结合所有维度特性
+                this.platforms.push(
+                    { x: 0, y: 550, width: 60, height: 50, dimension: 0 }, // 最窄起始平台
+                    { x: 300, y: 520, width: 50, height: 20, dimension: 3 }, // 能量场平台
+                    { x: 600, y: 520, width: 40, height: 20, dimension: 0 },
+                    { x: 150, y: 480, width: 40, height: 20, dimension: 1 }, // 反重力平台
+                    { x: 450, y: 480, width: 50, height: 20, dimension: 2 }, // 时间扭曲平台
+                    { x: 50, y: 440, width: 50, height: 20, dimension: 0 },
+                    { x: 250, y: 440, width: 40, height: 20, dimension: 3 }, // 能量场平台
+                    { x: 550, y: 440, width: 40, height: 20, dimension: 1 }, // 反重力平台
+                    { x: 350, y: 400, width: 60, height: 20, dimension: 0 },
+                    { x: 100, y: 360, width: 50, height: 20, dimension: 2 }, // 时间扭曲平台
+                    { x: 450, y: 360, width: 50, height: 20, dimension: 3 }, // 能量场平台
+                    { x: 700, y: 360, width: 50, height: 20, dimension: 0 },
+                    { x: 200, y: 320, width: 40, height: 20, dimension: 1 }, // 反重力平台
+                    { x: 550, y: 320, width: 50, height: 20, dimension: 2 }, // 时间扭曲平台
+                    { x: 300, y: 280, width: 50, height: 20, dimension: 0 },
+                    { x: 50, y: 240, width: 40, height: 20, dimension: 3 }, // 能量场平台
+                    { x: 400, y: 240, width: 50, height: 20, dimension: 1 }, // 反重力平台
+                    { x: 650, y: 240, width: 40, height: 20, dimension: 0 },
+                    { x: 200, y: 200, width: 60, height: 20, dimension: 2 }, // 时间扭曲平台
+                    { x: 350, y: 200, width: 40, height: 20, dimension: 3 }, // 能量场平台
+                    { x: 550, y: 200, width: 50, height: 20, dimension: 1 }, // 反重力平台
+                    { x: 100, y: 160, width: 50, height: 20, dimension: 0 },
+                    { x: 250, y: 160, width: 40, height: 20, dimension: 2 }, // 时间扭曲平台
+                    { x: 450, y: 160, width: 50, height: 20, dimension: 3 }, // 能量场平台
+                    { x: 600, y: 160, width: 40, height: 20, dimension: 1 }, // 反重力平台
+                    { x: 350, y: 120, width: 60, height: 20, dimension: 0 },
+                    { x: 50, y: 80, width: 50, height: 20, dimension: 2 }, // 时间扭曲平台
+                    { x: 200, y: 80, width: 50, height: 20, dimension: 3 }, // 能量场平台
+                    { x: 450, y: 80, width: 40, height: 20, dimension: 1 }, // 反重力平台
+                    { x: 700, y: 80, width: 50, height: 20, dimension: 0 },
+                    { x: 300, y: 40, width: 50, height: 20, dimension: 2 }  // 时间扭曲平台 - 终点
+                );
+                
+                // 极端密集的危险区域布局
+                this.hazards = [];
+                // 生成多层交错的危险区域网络
+                for (let y = 540; y >= 20; y -= 40) {
+                    const numHazards = 3 + Math.floor(Math.random() * 2);
+                    const positions = [];
+                    
+                    // 确保危险区域之间有足够的间隙供平台放置
+                    for (let i = 0; i < numHazards; i++) {
+                        let x;
+                        let valid = false;
+                        
+                        // 尝试找到有效的位置
+                        for (let attempts = 0; attempts < 10; attempts++) {
+                            x = Math.random() * (this.canvas.width - 100);
+                            valid = true;
+                            
+                            // 检查与现有危险区域的冲突
+                            for (const pos of positions) {
+                                if (Math.abs(x - pos) < 120) {
+                                    valid = false;
+                                    break;
+                                }
+                            }
+                            
+                            if (valid) break;
+                        }
+                        
+                        if (valid) {
+                            positions.push(x);
+                            this.hazards.push({
+                                x: x,
+                                y: y,
+                                width: 80 + Math.random() * 40,
+                                height: 20,
+                                dimension: 0,
+                                type: 'laser'
+                            });
+                        }
+                    }
                 }
                 
-                collectibles.push({
-                    x: targetPlatform.x + targetPlatform.width / 2 - 7,
-                    y: targetPlatform.y - 25,
-                    width: 15,
-                    height: 15,
-                    collected: false
-                });
-            }
+                // 添加额外的危险区域以增加难度
+                for (let i = 0; i < 15; i++) {
+                    this.hazards.push({
+                        x: Math.random() * (this.canvas.width - 100),
+                        y: 40 + Math.random() * 480,
+                        width: 60 + Math.random() * 60,
+                        height: 20,
+                        dimension: 0,
+                        type: 'laser'
+                    });
+                }
+                
+                // 大量收集品，分布在各个位置
+                this.collectibles = [];
+                for (let i = 0; i < 30; i++) {
+                    // 确保收集品不会生成在危险区域上
+                    let validPos = false;
+                    let x, y;
+                    
+                    while (!validPos) {
+                        x = 50 + Math.random() * (this.canvas.width - 100);
+                        y = 60 + Math.random() * 440;
+                        validPos = true;
+                        
+                        // 检查与危险区域的冲突
+                        for (const hazard of this.hazards) {
+                            if (x >= hazard.x - 20 && x <= hazard.x + hazard.width + 20 &&
+                                y >= hazard.y - 20 && y <= hazard.y + hazard.height + 20) {
+                                validPos = false;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    this.collectibles.push({
+                        x: x,
+                        y: y,
+                        width: 15,
+                        height: 15,
+                        collected: false
+                    });
+                }
+                break;
+                
+            default:
+                // 随机生成更复杂的关卡
+                this.generateRandomLevel(level);
+        }
+    }
+    
+    generateRandomLevel(level) {
+        // 基础平台
+        this.platforms.push({ x: 0, y: 550, width: 200, height: 50, dimension: 0 });
+        
+        // 随机生成平台和障碍物
+        const numPlatforms = 5 + Math.floor(level / 2);
+        for (let i = 0; i < numPlatforms; i++) {
+            const dimension = Math.floor(Math.random() * Math.min(4, 1 + Math.floor(level / 3)));
+            this.platforms.push({
+                x: 200 + i * 120 + Math.random() * 60,
+                y: 100 + Math.random() * 400,
+                width: 80 + Math.random() * 40,
+                height: 20,
+                dimension: dimension
+            });
         }
         
-        this.platforms.push(...platforms);
-        this.collectibles.push(...collectibles);
-        this.hazards.push(...hazards);
-        
-        // 确保所有收集品的collected状态为false
-        this.collectibles.forEach((c, idx) => {
-            if (c.collected !== false) {
-                console.warn(`Level ${level} collectible ${idx}: collected was ${c.collected}, resetting to false`);
-                c.collected = false;
-            }
-        });
-        
-        // 最终验证：确保至少有一个收集品
-        if (this.collectibles.length === 0) {
-            console.error(`Level ${level}: No collectibles generated! Adding one to base platform.`);
+        // 生成收集品
+        const numCollectibles = 3 + Math.floor(level / 2);
+        for (let i = 0; i < numCollectibles; i++) {
             this.collectibles.push({
-                x: 100,
-                y: 500,
+                x: 150 + i * 200 + Math.random() * 100,
+                y: 50 + Math.random() * 450,
                 width: 15,
                 height: 15,
                 collected: false
             });
         }
         
-        // 最终强制检查：如果还是不够，强制添加到基础平台
-        if (this.collectibles.length < numCollectibles) {
-            console.error(`Level ${level}: CRITICAL ERROR! Collectibles count mismatch! Expected ${numCollectibles}, got ${this.collectibles.length}. Adding to base platform.`);
-            const remaining = numCollectibles - this.collectibles.length;
-            for (let i = 0; i < remaining; i++) {
-                this.collectibles.push({
-                    x: 100 + i * 50,
-                    y: 500,
-                    width: 15,
-                    height: 15,
-                    collected: false
+        // 生成危险区域
+        if (level > 3) {
+            const numHazards = Math.floor(level / 3);
+            for (let i = 0; i < numHazards; i++) {
+                this.hazards.push({
+                    x: 300 + i * 200 + Math.random() * 100,
+                    y: 400 + Math.random() * 100,
+                    width: 60 + Math.random() * 40,
+                    height: 20,
+                    dimension: Math.floor(Math.random() * 4),
+                    type: 'laser'
                 });
             }
-            console.log(`- Fixed: Now have ${this.collectibles.length} collectibles`);
-        }
-        
-        // 最终验证：确保收集品数量正确
-        console.log(`Level ${level} generation complete:`);
-        console.log(`- Expected collectibles: ${numCollectibles}`);
-        console.log(`- Actual collectibles: ${this.collectibles.length}`);
-        console.log(`- All collected = false: ${this.collectibles.every(c => c.collected === false)}`);
-        
-        // 验证最终数量
-        if (this.collectibles.length !== numCollectibles) {
-            console.error(`Level ${level}: STILL MISMATCH! Expected ${numCollectibles}, got ${this.collectibles.length}`);
-        } else {
-            console.log(`✓ Level ${level}: Collectibles count verified: ${this.collectibles.length}`);
         }
     }
     
@@ -859,9 +856,6 @@ class QuantumJumper {
     }
     
     updatePlayer(deltaTime) {
-        const dimension = this.dimensions[this.currentDimension];
-        const isReverseGravity = dimension.gravity < 0; // 判断是否是反重力维度
-        
         // 水平移动
         if (this.keys['a'] || this.keys['arrowleft']) {
             this.player.vx = -this.player.speed;
@@ -871,16 +865,15 @@ class QuantumJumper {
             this.player.vx *= 0.8; // 摩擦力
         }
         
-        // 跳跃（在反重力模式下，跳跃应该是向下）
+        // 跳跃
         if ((this.keys['w'] || this.keys['arrowup'] || this.keys[' ']) && this.player.onGround) {
-            if (isReverseGravity) {
-                this.player.vy = 12; // 反重力模式下向下跳跃
-            } else {
-                this.player.vy = -12; // 正常模式下向上跳跃
-            }
+            this.player.vy = -12;
             this.player.onGround = false;
             this.playSound('playerJump');
         }
+        
+        // 获取当前维度信息
+        const dimension = this.dimensions[this.currentDimension];
         
         // 应用重力
         this.player.vy += dimension.gravity;
@@ -896,26 +889,51 @@ class QuantumJumper {
         this.player.x += this.player.vx;
         this.player.y += this.player.vy;
         
-        // 水平边界检查（阻止玩家移动到画布外）
-        if (this.player.x < 0) {
-            this.player.x = 0;
-            this.player.vx = 0;
-        }
-        if (this.player.x > this.canvas.width - this.player.width) {
-            this.player.x = this.canvas.width - this.player.width;
-            this.player.vx = 0;
-        }
+        // 边界检查
+        if (this.player.x < 0) this.player.x = 0;
+        if (this.player.x > this.canvas.width - this.player.width) this.player.x = this.canvas.width - this.player.width;
         
-        // 垂直边界限制（防止无限飞出，但允许反重力模式正常工作）
-        // 正常重力模式下，阻止向上超出画布顶部太多
-        if (!isReverseGravity && this.player.y < -10) {
-            this.player.y = -10;
-            this.player.vy = Math.max(0, this.player.vy); // 允许向下移动
-        }
-        // 反重力模式下，阻止向下超出画布底部太多
-        if (isReverseGravity && this.player.y > this.canvas.height - this.player.height + 10) {
-            this.player.y = this.canvas.height - this.player.height + 10;
-            this.player.vy = Math.min(0, this.player.vy); // 允许向上移动
+        // 反重力模式下的上边界特殊处理
+        if (dimension.gravity < 0) { // 反重力模式
+            // 限制反重力模式下的最大上升速度
+            if (this.player.vy < -8) { // 限制最大上升速度，防止飞得太快
+                this.player.vy = -8;
+            }
+            
+            // 设置上界阻拦，但允许玩家部分飞出屏幕以便看到
+            const upperBound = -30; // 设置一个合理的上界，比完全看不见稍多一点
+            if (this.player.y < upperBound) {
+                // 当接近上界时减速
+                if (this.player.y < upperBound && this.player.vy < 0) {
+                    this.player.vy *= 0.95; // 轻微减速效果
+                }
+                
+                // 当完全达到上界时，施加一个向上的阻力
+                if (this.player.y <= upperBound - 10) {
+                    this.player.vy += 0.1; // 提供一个向上的阻力，帮助玩家更容易掉回来
+                }
+                
+                // 开始计时警告
+                if (!this.isOutOfBoundsWarning) {
+                    this.isOutOfBoundsWarning = true;
+                    this.outOfBoundsTimer = 0;
+                } else {
+                    this.outOfBoundsTimer += deltaTime;
+                    
+                    // 超过5秒未返回，游戏失败
+                    if (this.outOfBoundsTimer > this.outOfBoundsWarningTime) {
+                        this.gameOver();
+                    }
+                }
+            } else if (this.isOutOfBoundsWarning) {
+                // 玩家回到安全区域，重置警告
+                this.outOfBoundsTimer = 0;
+                this.isOutOfBoundsWarning = false;
+            }
+        } else if (this.isOutOfBoundsWarning) {
+            // 切换到非反重力维度，重置警告
+            this.outOfBoundsTimer = 0;
+            this.isOutOfBoundsWarning = false;
         }
         
         // 更新轨迹
@@ -941,68 +959,35 @@ class QuantumJumper {
     }
     
     checkCollisions() {
-        const dimension = this.dimensions[this.currentDimension];
-        const isReverseGravity = dimension.gravity < 0; // 判断是否是反重力维度
-        
         // 平台碰撞
         this.platforms.forEach(platform => {
             if (platform.dimension === this.currentDimension || platform.dimension === undefined) {
                 if (this.isColliding(this.player, platform)) {
-                    if (isReverseGravity) {
-                        // 反重力模式：从下往上碰撞，落在平台下表面
-                        // 玩家向上移动且玩家的顶部在平台底部下方或刚刚越过
-                        if (this.player.vy < 0 && 
-                            this.player.y < platform.y + platform.height && 
-                            this.player.y + this.player.height > platform.y + platform.height) {
-                            this.player.y = platform.y + platform.height;
-                            this.player.vy = 0;
-                            this.player.onGround = true;
-                        }
-                    } else {
-                        // 正常重力模式：从上往下碰撞，落在平台上面
-                        // 玩家向下移动且玩家的底部在平台顶部上方或刚刚越过
-                        if (this.player.vy > 0 && 
-                            this.player.y + this.player.height > platform.y && 
-                            this.player.y < platform.y) {
-                            this.player.y = platform.y - this.player.height;
-                            this.player.vy = 0;
-                            this.player.onGround = true;
-                        }
+                    const dimension = this.dimensions[this.currentDimension];
+                    
+                    // 标准重力模式：玩家从上方落在平台上
+                    if (this.player.vy > 0 && this.player.y < platform.y) {
+                        this.player.y = platform.y - this.player.height;
+                        this.player.vy = 0;
+                        this.player.onGround = true;
+                    }
+                    // 反重力模式：玩家从下方落在平台上
+                    else if (dimension.gravity < 0 && this.player.vy < 0 && this.player.y > platform.y) {
+                        this.player.y = platform.y + platform.height;
+                        this.player.vy = 0;
+                        this.player.onGround = true;
                     }
                 }
             }
         });
         
-        // 收集品碰撞 - 只处理当前关卡内的收集品
+        // 收集品碰撞
         this.collectibles.forEach((collectible, index) => {
-            // 确保collectible有collected属性
-            if (collectible.collected === undefined || collectible.collected === null) {
-                collectible.collected = false;
-            }
-            
-            // 检查碰撞：当前关卡内的收集品且还未收集
-            if (collectible.collected !== true && this.isColliding(this.player, collectible)) {
-                // 标记当前关卡的这个收集品为已收集
+            if (!collectible.collected && this.isColliding(this.player, collectible)) {
                 collectible.collected = true;
-                
-                // 累计量子碎片（全局累计）
                 this.quantumShards++;
-                
-                // 恢复能量
                 this.energy = Math.min(this.energy + 10, this.maxEnergy);
-                
-                // 创建收集效果
                 this.createCollectionEffect(collectible);
-                
-                // 调试信息：显示当前关卡进度和累计总数
-                const remainingInCurrentLevel = this.collectibles.filter(c => c.collected !== true).length;
-                const totalInCurrentLevel = this.collectibles.length;
-                console.log(`✓ Collected shard in level ${this.currentLevel}: ${totalInCurrentLevel - remainingInCurrentLevel}/${totalInCurrentLevel} (总量子碎片: ${this.quantumShards})`);
-                
-                // 如果当前关卡全部收集完成
-                if (remainingInCurrentLevel === 0) {
-                    console.log(`🎉 Level ${this.currentLevel} all ${totalInCurrentLevel} collectibles collected!`);
-                }
             }
         });
         
@@ -1013,54 +998,38 @@ class QuantumJumper {
             }
         });
         
-        // 掉落检测（包括反重力情况）
-        // 添加维度切换后的短暂保护期（500ms），避免切换瞬间掉落扣能量
-        const timeSinceDimensionSwitch = Date.now() - this.lastDimensionSwitchTime;
-        const dimensionSwitchProtection = timeSinceDimensionSwitch < 500;
-        const currentTime = Date.now();
-        
-        if (isReverseGravity) {
-            // 反重力模式：从上方掉落
-            if (this.player.y < -50 && !dimensionSwitchProtection) {
-                // 首次超出上界，记录时间
-                if (this.upperBoundWarningTime === 0) {
-                    this.upperBoundWarningTime = currentTime;
-                }
-                
-                // 检查是否超过宽限期
-                const timeSinceWarning = currentTime - this.upperBoundWarningTime;
-                if (timeSinceWarning >= this.upperBoundGracePeriod) {
-                    // 宽限期已过，gameover
-                    this.takeDamage(50);
-                    this.resetPlayer();
-                    this.upperBoundWarningTime = 0; // 重置警告时间
-                }
-                // 否则在宽限期内，允许玩家切换维度来恢复
-            } else if (this.player.y >= -50) {
-                // 玩家回到屏幕内，清除警告
-                this.upperBoundWarningTime = 0;
-            }
-        } else {
-            // 正常重力模式：从下方掉落
-            // 如果之前在反重力模式下超出上界，现在切换回正常维度，检查是否恢复
-            if (this.upperBoundWarningTime > 0) {
-                // 如果玩家回到屏幕内（y >= 0），清除警告
-                if (this.player.y >= 0 && this.player.y <= this.canvas.height) {
-                    this.upperBoundWarningTime = 0; // 成功恢复，清除警告
-                } else {
-                    // 还在屏幕外，继续计时
-                    const timeSinceWarning = currentTime - this.upperBoundWarningTime;
-                    if (timeSinceWarning >= this.upperBoundGracePeriod) {
-                        // 宽限期已过，gameover
-                        this.takeDamage(50);
-                        this.resetPlayer();
-                        this.upperBoundWarningTime = 0; // 重置警告时间
+        // 掉落检测
+        // 只有当玩家完全掉出屏幕且没有落在任何平台上时才触发
+        // 确保掉落回来时只要落在可落表面上就不扣能量
+        let isOnAnyPlatform = this.player.onGround;
+        if (!isOnAnyPlatform && this.player.y > this.canvas.height) {
+            // 额外检查玩家是否真的没有落在任何平台上
+            // 获取当前维度
+            const dimension = this.dimensions[this.currentDimension];
+            
+            // 再次确认是否真的不在任何平台上
+            // 计算玩家底部（标准重力）或顶部（反重力）的位置
+            let playerContactY = dimension.gravity > 0 ? this.player.y + this.player.height : this.player.y;
+            
+            // 检查是否有任何平台可能会接住玩家
+            let willLandOnPlatform = false;
+            this.platforms.forEach(platform => {
+                if ((platform.dimension === this.currentDimension || platform.dimension === undefined) && 
+                    this.player.x < platform.x + platform.width && 
+                    this.player.x + this.player.width > platform.x) {
+                    // 标准重力：检查平台顶部
+                    if (dimension.gravity > 0 && platform.y >= playerContactY) {
+                        willLandOnPlatform = true;
+                    }
+                    // 反重力：检查平台底部
+                    else if (dimension.gravity < 0 && platform.y + platform.height <= playerContactY) {
+                        willLandOnPlatform = true;
                     }
                 }
-            }
+            });
             
-            // 正常重力的掉落检测（独立于反重力警告）
-            if (this.player.y > this.canvas.height + 50 && !dimensionSwitchProtection) {
+            // 只有当玩家真的没有落在任何平台上时才扣能量
+            if (!willLandOnPlatform) {
                 this.takeDamage(50);
                 this.resetPlayer();
             }
@@ -1091,107 +1060,56 @@ class QuantumJumper {
     }
     
     takeDamage(amount) {
-        this.energy -= amount;
-        this.playSound('hazardHit');
-        if (this.energy <= 0) {
-            this.gameOver();
+        // 在反重力模式下从边界返回时不扣除能量
+        const dimension = this.dimensions[this.currentDimension];
+        if (!(dimension.gravity < 0 && this.isOutOfBoundsWarning)) {
+            this.energy -= amount;
+            this.playSound('hazardHit');
+            if (this.energy <= 0) {
+                this.gameOver();
+            }
         }
     }
     
     gameOver() {
-        this.gameState = 'menu';
-        document.getElementById('gameOverlay').classList.remove('hidden');
-        
-        // 重要：不重置当前关卡，保持当前关卡
-        // 不重置量子碎片（quantumShards），保持累计值
-        // 只重置当前关卡的状态标志
-        
-        console.log(`Game over at level ${this.currentLevel}`);
-        console.log(`- Current level will be restarted (collectibles will be reset)`);
-        console.log(`- Quantum shards (累计) remain: ${this.quantumShards}`);
-        
-        // 如果是4-10关，增加重启计数，下次加载时会有随机变化
-        if (this.currentLevel >= 4 && this.currentLevel <= 10) {
-            if (!this.levelRestartCount[this.currentLevel]) {
-                this.levelRestartCount[this.currentLevel] = 0;
-            }
-            this.levelRestartCount[this.currentLevel]++; // 增加重启计数
-        }
-        
-        // 注意：收集品数组会在startGame -> loadLevel时重置
-        // 量子碎片不会重置（累计值）
-        
-        // 能量会在startGame时恢复
+        // 能量耗尽时在当前关卡重新初始化，而不是回到第一关
+        this.energy = this.maxEnergy; // 恢复能量
+        this.quantumShards = 0; // 重置收集的碎片
+        this.outOfBoundsTimer = 0;
+        this.isOutOfBoundsWarning = false;
+        this.currentDimension = 0; // 重置为正常维度
+        this.resetPlayer(); // 重置玩家位置
+        this.loadLevel(this.currentLevel); // 重新加载当前关卡
         this.updateUI();
+        
+        // 保持游戏状态为playing，不显示菜单
+        // 如果需要显示一个简短的"复活"提示，可以在这里添加
+        this.createRespawnEffect();
+    }
+    
+    createRespawnEffect() {
+        // 创建复活效果
+        for (let i = 0; i < 20; i++) {
+            this.particles.push({
+                x: this.player.x + this.player.width/2,
+                y: this.player.y + this.player.height/2,
+                vx: (Math.random() - 0.5) * 10,
+                vy: (Math.random() - 0.5) * 10,
+                life: 50,
+                maxLife: 50,
+                color: '#00ff00',
+                size: Math.random() * 4 + 2
+            });
+        }
     }
     
     checkWinCondition() {
-        // 确保有收集品且游戏状态正确
-        if (this.collectibles.length === 0) {
-            console.warn(`Level ${this.currentLevel}: No collectibles! This should not happen.`);
-            return;
-        }
-        
-        if (this.gameState !== 'playing') {
-            return;
-        }
-        
-        // 关键修复：只检查当前关卡内的收集品状态（不依赖累计的quantumShards）
-        // 确保所有collectibles的collected属性都是明确的布尔值
-        this.collectibles.forEach((c, idx) => {
-            if (c.collected === undefined || c.collected === null) {
-                console.warn(`Level ${this.currentLevel} collectible ${idx}: collected is ${c.collected}, fixing to false`);
-                c.collected = false;
-            }
-        });
-        
-        // 严格检查：当前关卡内所有收集品都必须 collected === true
-        const currentLevelCollectibles = this.collectibles; // 当前关卡的收集品数组
-        const uncollectedInCurrentLevel = currentLevelCollectibles.filter(c => c.collected !== true);
-        const collectedInCurrentLevel = currentLevelCollectibles.filter(c => c.collected === true);
-        
-        const uncollectedCount = uncollectedInCurrentLevel.length;
-        const collectedCount = collectedInCurrentLevel.length;
-        const totalInCurrentLevel = currentLevelCollectibles.length;
-        
-        // 通关条件：当前关卡内所有收集品都已收集（collected === true）
-        const allCollectedInCurrentLevel = uncollectedCount === 0 && collectedCount === totalInCurrentLevel && totalInCurrentLevel > 0;
-        
-        // 每帧检查（只在接近完成时输出）
-        if (uncollectedCount <= 2) {
-            console.log(`[Level ${this.currentLevel}] Current level progress: ${collectedCount}/${totalInCurrentLevel} collected (量子碎片总数: ${this.quantumShards})`);
-        }
-        
-        // 检查是否当前关卡的所有收集品都已收集
-        if (allCollectedInCurrentLevel && !this.levelCompleteTriggered) {
-            console.log(`=== LEVEL ${this.currentLevel} COMPLETED ===`);
-            console.log(`Current level collectibles: ${totalInCurrentLevel}`);
-            console.log(`Collected in current level: ${collectedCount}`);
-            console.log(`Uncollected in current level: ${uncollectedCount}`);
-            console.log(`Total quantum shards (accumulated): ${this.quantumShards}`);
-            console.log(`All collected in current level: ${allCollectedInCurrentLevel}`);
-            console.log(`Level complete triggered: ${this.levelCompleteTriggered}`);
-            
-            // 验证每个收集品的状态
-            currentLevelCollectibles.forEach((c, idx) => {
-                console.log(`  Collectible ${idx}: collected=${c.collected} (should be true)`);
-            });
-            
-            this.levelCompleteTriggered = true;
+        const allCollected = this.collectibles.every(c => c.collected);
+        if (allCollected && this.collectibles.length > 0) {
             this.showLevelComplete();
-            
-            // 使用箭头函数确保this绑定正确
-            const self = this;
-            const currentLevel = this.currentLevel; // 保存关卡号
             setTimeout(() => {
-                console.log(`Timeout callback executing for level ${currentLevel}`);
-                if (self.currentLevel === currentLevel) { // 确保关卡还没变化
-                    self.nextLevel();
-                }
+                this.nextLevel();
             }, 2000);
-        } else if (allCollectedInCurrentLevel && this.levelCompleteTriggered) {
-            // 已经触发但还没切换，可能是setTimeout没执行
-            console.warn(`Level ${this.currentLevel} completed but not advanced. Triggered: ${this.levelCompleteTriggered}`);
         }
     }
     
@@ -1211,69 +1129,46 @@ class QuantumJumper {
         }
     }
     
-    showVictory() {
-        this.gameState = 'victory';
-        // 创建胜利效果
-        for (let i = 0; i < 100; i++) {
-            this.particles.push({
-                x: this.canvas.width / 2 + (Math.random() - 0.5) * 400,
-                y: this.canvas.height / 2 + (Math.random() - 0.5) * 400,
-                vx: (Math.random() - 0.5) * 20,
-                vy: (Math.random() - 0.5) * 20,
-                life: 100,
-                maxLife: 100,
-                color: '#00ff00',
-                size: Math.random() * 8 + 2
-            });
-        }
-        
-        // 显示胜利界面
-        document.getElementById('victoryOverlay').classList.remove('hidden');
+    nextLevel() {
+        this.currentLevel++;
+        this.energy = this.maxEnergy; // 恢复能量
+        this.loadLevel(this.currentLevel);
+        this.resetPlayer();
+        this.updateUI();
     }
     
-    nextLevel() {
-        console.log(`=== nextLevel() called ===`);
-        console.log(`Current level: ${this.currentLevel}`);
-        console.log(`Max level: ${this.maxLevel}`);
-        console.log(`Game state: ${this.gameState}`);
-        
-        if (this.currentLevel >= this.maxLevel) {
-            // 完成所有关卡，显示胜利
-            console.log('All levels completed! Showing victory screen.');
-            this.showVictory();
-        } else {
-            const previousLevel = this.currentLevel;
-            this.currentLevel++;
-            console.log(`Moving from level ${previousLevel} to level ${this.currentLevel}`);
+    renderOutOfBoundsWarning() {
+        if (this.isOutOfBoundsWarning) {
+            const remainingTime = Math.ceil((this.outOfBoundsWarningTime - this.outOfBoundsTimer) / 1000);
             
-            this.energy = this.maxEnergy; // 恢复能量
-            this.levelCompleteTriggered = false; // 重置关卡完成标志
+            // 绘制警告背景 - 更淡的红色
+            this.ctx.fillStyle = 'rgba(255, 100, 100, 0.05)'; // 使用淡红色，透明度更低
+            this.ctx.fillRect(0, 0, this.canvas.width, 80);
             
-            console.log(`Loading level ${this.currentLevel}...`);
-            this.loadLevel(this.currentLevel);
+            // 绘制警告边框 - 更淡的红色
+            this.ctx.strokeStyle = 'rgba(255, 100, 100, 0.2)'; // 使用淡红色，透明度更低
+            this.ctx.lineWidth = 1; // 保持细边框
+            this.ctx.strokeRect(0, 0, this.canvas.width, 80);
             
-            console.log(`Level ${this.currentLevel} loaded:`);
-            console.log(`- Platforms: ${this.platforms.length}`);
-            console.log(`- Collectibles: ${this.collectibles.length}`);
-            console.log(`- Hazards: ${this.hazards.length}`);
+            // 绘制警告文字 - 使用白色文字
+            this.ctx.font = 'bold 18px Arial'; // 保持字体大小
+            this.ctx.fillStyle = 'rgba(255, 255, 255, 0.6)'; // 稍微降低文字透明度
+            this.ctx.textAlign = 'center';
+            this.ctx.fillText('警告：反重力模式下正在离开边界！', this.canvas.width / 2, 30);
             
-            // 验证收集品是否正确初始化
-            const uncollected = this.collectibles.filter(c => !c.collected).length;
-            const collected = this.collectibles.filter(c => c.collected).length;
-            console.log(`- Uncollected: ${uncollected}, Collected: ${collected}`);
-            
-            if (this.collectibles.length === 0) {
-                console.error(`ERROR: Level ${this.currentLevel} has no collectibles!`);
+            // 绘制倒计时 - 使用更淡的红色
+            this.ctx.font = 'bold 24px Arial'; // 保持字体大小
+            this.ctx.fillStyle = 'rgba(255, 100, 100, 0.3)'; // 使用淡红色，透明度更低
+            // 倒计时闪烁效果
+            if (remainingTime > 3 || Math.floor(Date.now() / 500) % 2 === 0) {
+                this.ctx.fillText('切换维度返回：' + remainingTime + 's', this.canvas.width / 2, 65);
             }
             
-            this.resetPlayer();
-            this.updateUI();
-            
-            // 确保游戏状态为playing
-            if (this.gameState !== 'playing') {
-                console.warn(`Game state was ${this.gameState}, setting to playing`);
-                this.gameState = 'playing';
-            }
+            // 绘制箭头提示 - 使用更淡的文字
+            this.ctx.fillStyle = 'rgba(255, 255, 255, 0.6)'; // 降低提示文字透明度
+            this.ctx.font = '14px Arial'; // 略微减小字体
+            this.ctx.textAlign = 'left';
+            this.ctx.fillText('按1/3/4切换维度', 20, 65);
         }
     }
     
@@ -1306,8 +1201,8 @@ class QuantumJumper {
         // 绘制维度指示器
         this.renderDimensionIndicator();
         
-        // 绘制宽限期警告
-        this.renderUpperBoundWarning();
+        // 绘制越界警告
+        this.renderOutOfBoundsWarning();
     }
     
     renderDimensionBackground() {
@@ -1515,46 +1410,9 @@ class QuantumJumper {
         this.ctx.fillRect(this.canvas.width - 4, 0, 4, this.canvas.height);
     }
     
-    renderUpperBoundWarning() {
-        // 如果在上界宽限期内，显示警告
-        if (this.upperBoundWarningTime > 0 && this.gameState === 'playing') {
-            const currentTime = Date.now();
-            const timeSinceWarning = currentTime - this.upperBoundWarningTime;
-            const remainingTime = this.upperBoundGracePeriod - timeSinceWarning;
-            
-            if (remainingTime > 0) {
-                // 计算警告强度（越接近0越紧急）
-                const warningIntensity = Math.min(1, remainingTime / 1000); // 最后1秒最紧急
-                const alpha = 0.5 + (1 - warningIntensity) * 0.5; // 透明度随剩余时间变化
-                const pulse = Math.sin(Date.now() * 0.01) * 0.2 + 0.8; // 脉冲效果
-                
-                // 绘制红色警告背景闪烁效果
-                this.ctx.fillStyle = `rgba(255, 0, 0, ${alpha * 0.2 * pulse})`;
-                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-                
-                // 绘制警告文字（带阴影效果）
-                const remainingSeconds = (remainingTime / 1000).toFixed(1);
-                this.ctx.font = 'bold 36px Orbitron, sans-serif';
-                this.ctx.textAlign = 'center';
-                this.ctx.textBaseline = 'middle';
-                
-                // 文字阴影
-                this.ctx.fillStyle = `rgba(0, 0, 0, ${alpha * 0.8})`;
-                this.ctx.fillText('警告：超出边界！', this.canvas.width / 2 + 2, this.canvas.height / 2 - 42);
-                this.ctx.fillText(`剩余时间: ${remainingSeconds}秒`, this.canvas.width / 2 + 2, this.canvas.height / 2 - 2);
-                this.ctx.fillText('请切换维度返回！', this.canvas.width / 2 + 2, this.canvas.height / 2 + 38);
-                
-                // 文字主体
-                this.ctx.fillStyle = `rgba(255, 0, 0, ${alpha})`;
-                this.ctx.fillText('警告：超出边界！', this.canvas.width / 2, this.canvas.height / 2 - 40);
-                this.ctx.fillText(`剩余时间: ${remainingSeconds}秒`, this.canvas.width / 2, this.canvas.height / 2);
-                this.ctx.fillText('请切换维度返回！', this.canvas.width / 2, this.canvas.height / 2 + 40);
-            }
-        }
-    }
-    
     updateUI() {
         document.getElementById('currentLevel').textContent = this.currentLevel;
+        document.getElementById('currentLevelDisplay').textContent = this.currentLevel; // 更新导航栏中的关卡显示
         document.getElementById('quantumShards').textContent = this.quantumShards;
         document.getElementById('energyValue').textContent = Math.max(0, this.energy);
         
