@@ -714,18 +714,15 @@ class QuantumJumper {
                 this.player.vy = -8;
             }
             
-            // 设置上界阻拦，但允许玩家部分飞出屏幕以便看到
-            const upperBound = -30; // 设置一个合理的上界，比完全看不见稍多一点
-            if (this.player.y < upperBound) {
-                // 当接近上界时减速
-                if (this.player.y < upperBound && this.player.vy < 0) {
-                    this.player.vy *= 0.95; // 轻微减速效果
-                }
-                
-                // 当完全达到上界时，施加一个向上的阻力
-                if (this.player.y <= upperBound - 10) {
-                    this.player.vy += 0.1; // 提供一个向上的阻力，帮助玩家更容易掉回来
-                }
+            // 设置上界阻隔 - 比游戏界面高一点，让玩家恰好不出现在游戏界面中
+            const upperBoundary = -60; // 上界位置，比玩家高度再低一些
+            
+            // 上界碰撞检测 - 反重力模式下，玩家会落在上界的下表面
+            if (this.player.y < upperBoundary && this.player.vy < 0) {
+                // 玩家与上界碰撞
+                this.player.y = upperBoundary;
+                this.player.vy = 0;
+                this.player.onGround = true; // 视为着地状态，允许跳跃
                 
                 // 开始计时警告
                 if (!this.isOutOfBoundsWarning) {
@@ -739,7 +736,7 @@ class QuantumJumper {
                         this.gameOver();
                     }
                 }
-            } else if (this.isOutOfBoundsWarning) {
+            } else if (this.isOutOfBoundsWarning && this.player.y > -this.player.height) {
                 // 玩家回到安全区域，重置警告
                 this.outOfBoundsTimer = 0;
                 this.isOutOfBoundsWarning = false;
