@@ -67,7 +67,7 @@ class QuantumJumper {
         this.generateParticles();
         this.loadLevel(1);
         this.gameLoop();
-        this.startBackgroundMusic();
+        // 移除自动播放背景音乐，改为在用户交互后播放
     }
     
     setupEventListeners() {
@@ -192,6 +192,8 @@ class QuantumJumper {
         document.getElementById('gameOverlay').classList.add('hidden');
         this.resetPlayer();
         this.loadLevel(this.currentLevel);
+        // 在用户开始游戏时播放背景音乐
+        this.startBackgroundMusic();
     }
     
     togglePause() {
